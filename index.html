@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Summer Into AI 2026 — Competition #2</title>
+<style>
+  :root { --red:#c1272d; --white:#f4f1e8; --blue:#2a3f7a; --gold:#e8c34a; --ink:#07080f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body {
+    background:var(--ink); color:var(--white); font-family:"Courier New",monospace;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:24px; padding:24px; text-align:center;
+  }
+  h1 { font-size:clamp(20px,5vw,36px); letter-spacing:3px;
+       text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue); }
+  h1 .star { color:var(--gold); }
+  .sub { opacity:.7; letter-spacing:1px; font-size:13px; max-width:520px; }
+  .weeks { display:flex; flex-direction:column; gap:14px; width:100%; max-width:520px; }
+  a.week {
+    display:block; text-decoration:none; color:var(--white);
+    border:3px solid var(--gold); background:#0b0f22; padding:18px 20px;
+    text-align:left; transition:transform .08s, background .15s;
+  }
+  a.week:hover { background:#11183a; transform:translateY(-2px); }
+  a.week .wk { color:var(--gold); letter-spacing:2px; font-size:12px; }
+  a.week .title { font-size:18px; margin-top:6px; }
+  a.week .desc { opacity:.65; font-size:12px; margin-top:4px; }
+  .foot { opacity:.5; font-size:11px; }
+  .foot a { color:var(--gold); }
+</style>
+</head>
+<body>
+  <h1><span class="star">★</span> SUMMER INTO AI 2026 <span class="star">★</span></h1>
+  <div class="sub">Competition #2 &middot; weekly AI builds, shipped in public for <b>@advisoryhour</b>.</div>
+  <div class="weeks">
+    <a class="week" href="week-1/">
+      <div class="wk">WEEK 1 &middot; 8-BIT AMERICA</div>
+      <div class="title">★ Game of Liberty</div>
+      <div class="desc">Conway&rsquo;s Game of Life &mdash; but it plays the birth of a nation.</div>
+    </a>
+  </div>
+  <div class="foot">Rules &amp; scoring: <a href="https://github.com/">COMPETITION.md</a> in this repo.</div>
+</body>
+</html>

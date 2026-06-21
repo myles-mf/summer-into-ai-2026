@@ -1,0 +1,9 @@
+# Our actual post drafts stay local — not committed to the public repo
+**/SUBMISSION.md
+SUBMISSION.md
+
+# Local tooling / harness config — not part of the public deliverable
+.claude/
+
+# OS / editor cruft
+.DS_Store
