@@ -1,6 +1,7 @@
 # Summer Into AI 2026 — Competition #2 · Shared Reference
 
-> The reusable playbook for **every week**. Per-week builds live in `week-N/`.
+> The reusable playbook for **every week**. Per-week builds live in `week-N/` (committed).
+> **Post drafts live in `posts/week-N/` — that whole folder is gitignored and never committed.**
 > Host: **Eric / @advisoryhour** on Substack · Source post: *"Summer Into AI: Are You Ready to Cook"*
 > Cadence: a new **theme drops Monday**, submissions due **before Sunday (local midnight)**.
 
@@ -61,7 +62,8 @@ Write a public post and **tag @advisoryhour**, including:
 - [ ] **Differentiate**: ship a different *shape* than the crowd (the field skews to arcade mini-games + AI videos).
 - [ ] Build the artifact (keep it self-contained where possible — one file = both proofs).
 - [ ] Get **both** proofs where you can (live demo **and** public code → stronger + helps the "most public demos" tiebreaker).
-- [ ] Deploy (see `week-1/SUBMISSION.md` → DEPLOY section; GitHub Pages gives both links).
+- [ ] Draft the post in `posts/week-N/SUBMISSION.md` (gitignored — stays local).
+- [ ] Deploy: commit `week-N/` and push; the live demo is at `https://myles-mf.github.io/summer-into-ai-2026/week-N/`.
 - [ ] Write the post, tag **@advisoryhour**, include all 5 fields above.
 - [ ] Reference **one** competitor meaningfully (bonus).
 - [ ] **Publish before Sunday midnight.**

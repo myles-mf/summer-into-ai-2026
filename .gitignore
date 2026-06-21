@@ -1,4 +1,8 @@
-# Our actual post drafts stay local — not committed to the public repo
+# Our actual post drafts live here — local only, never committed.
+# Keep per-week subfolders inside (posts/week-1/, posts/week-2/, ...).
+posts/
+
+# Safety net: stray post drafts anywhere are also ignored
 **/SUBMISSION.md
 SUBMISSION.md
 
