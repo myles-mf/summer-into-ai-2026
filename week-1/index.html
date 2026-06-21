@@ -4,142 +4,101 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>GAME OF LIBERTY — 8-Bit America</title>
-<meta name="description" content="Conway's Game of Life, but it plays the birth of a nation. A generative 8-bit simulation for Summer Into AI." />
+<meta name="description" content="Repel the redcoat invasion and liberate the nation — an 8-bit territory battle for Summer Into AI." />
 <style>
-  :root {
-    --red: #c1272d;
-    --white: #f4f1e8;
-    --blue: #2a3f7a;
-    --gold: #e8c34a;
-    --ink: #07080f;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    height: 100%;
-    background: var(--ink);
-    color: var(--white);
-    font-family: "Courier New", monospace;
-    overflow: hidden;
-  }
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 14px;
-  }
-  h1 {
-    font-size: clamp(18px, 4vw, 32px);
-    letter-spacing: 3px;
-    text-shadow: 3px 3px 0 var(--red), -1px -1px 0 var(--blue);
-    text-align: center;
-  }
-  h1 .star { color: var(--gold); }
-  .sub { font-size: 12px; opacity: 0.7; letter-spacing: 1px; text-align: center; }
-  .stage {
-    position: relative;
-    border: 4px solid var(--gold);
-    box-shadow: 0 0 0 4px var(--ink), 0 0 30px rgba(232,195,74,0.3);
-    background: #04050a;
-    line-height: 0;
-    touch-action: none;
-  }
-  canvas { display: block; cursor: none; image-rendering: pixelated; }
-  .stage::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px),
-      radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,0.5) 100%);
-    mix-blend-mode: multiply;
-  }
-  .hud {
-    display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
-    font-size: 13px; letter-spacing: 1px;
-  }
-  .hud b { color: var(--gold); }
-  .controls { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
-  .controls.stamps { margin-top: -4px; }
-  button {
-    font-family: inherit; font-size: 12px; letter-spacing: 1px;
-    color: var(--ink); background: var(--gold); border: none;
-    border-bottom: 3px solid #a9842a; padding: 7px 11px; cursor: pointer;
-    text-transform: uppercase;
-  }
-  button:hover { filter: brightness(1.1); }
-  button:active { transform: translateY(2px); border-bottom-width: 1px; }
-  button.alt { background: var(--blue); color: var(--white); border-bottom-color: #16244c; }
-  button.red { background: var(--red); color: var(--white); border-bottom-color: #7a161b; }
-  button.stamp { background: #11162e; color: var(--white); border-bottom-color: #000; }
-  button.stamp.on { background: var(--gold); color: var(--ink); border-bottom-color: #a9842a; }
-  .hint { font-size: 11px; opacity: 0.55; text-align: center; max-width: 660px; }
-  .liberty-flash { animation: flash 0.4s ease-out; }
-  @keyframes flash { from { box-shadow: 0 0 0 4px var(--ink), 0 0 60px var(--gold); } }
+  :root { --red:#d12b30; --white:#f4f1e8; --blue:#3f63c8; --navy:#1a2a55; --gold:#e8c34a; --ink:#07080f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--ink); color:var(--white); font-family:"Courier New",monospace; overflow:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:12px; }
+  h1 { font-size:clamp(16px,3.4vw,28px); letter-spacing:3px; text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue); text-align:center; }
+  h1 .star { color:var(--gold); }
+  .sub { font-size:11px; opacity:.65; letter-spacing:1px; text-align:center; }
+
+  /* tug-of-war bar */
+  .tug { width:648px; max-width:100%; height:22px; border:3px solid var(--gold); display:flex; background:#222; overflow:hidden; }
+  .tug .p { background:linear-gradient(var(--blue),#2a47a0); transition:width .15s linear; display:flex; align-items:center; }
+  .tug .n { background:#15182a; flex:1; }
+  .tug .r { background:linear-gradient(var(--red),#9a1d22); transition:width .15s linear; display:flex; align-items:center; justify-content:flex-end; }
+  .tug span { font-size:11px; padding:0 6px; color:#fff; white-space:nowrap; }
+
+  .stage { position:relative; border:4px solid var(--gold); box-shadow:0 0 0 4px var(--ink),0 0 28px rgba(232,195,74,.3); background:#04050a; line-height:0; touch-action:none; }
+  canvas { display:block; cursor:none; image-rendering:pixelated; }
+  .stage::after { content:""; position:absolute; inset:0; pointer-events:none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px),
+                radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,.5) 100%);
+    mix-blend-mode:multiply; }
+  .flash { position:absolute; inset:0; pointer-events:none; opacity:0; transition:opacity .12s; }
+
+  /* overlay (start / win / lose) */
+  .overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    background:rgba(4,6,14,.86); text-align:center; padding:20px; }
+  .overlay.hidden { display:none; }
+  .overlay h2 { font-size:clamp(20px,4vw,34px); letter-spacing:2px; text-shadow:3px 3px 0 var(--red); }
+  .overlay p { font-size:13px; opacity:.85; max-width:460px; line-height:1.6; white-space:pre-line; }
+
+  .hud { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; font-size:13px; letter-spacing:1px; }
+  .hud b { color:var(--gold); }
+  .pips { letter-spacing:2px; }
+  .controls { display:flex; gap:7px; flex-wrap:wrap; justify-content:center; }
+  button { font-family:inherit; font-size:12px; letter-spacing:1px; color:var(--ink); background:var(--gold); border:none;
+    border-bottom:3px solid #a9842a; padding:8px 14px; cursor:pointer; text-transform:uppercase; }
+  button:hover { filter:brightness(1.1); }
+  button:active { transform:translateY(2px); border-bottom-width:1px; }
+  button.alt { background:var(--navy); color:var(--white); border-bottom-color:#0c1430; }
+  .hint { font-size:11px; opacity:.55; text-align:center; max-width:660px; }
+  @keyframes shake { 0%,100%{transform:translate(0,0);} 25%{transform:translate(-3px,1px);} 50%{transform:translate(2px,-2px);} 75%{transform:translate(-1px,2px);} }
+  .stage.shake { animation:shake .22s; }
 </style>
 </head>
 <body>
   <h1><span class="star">★</span> GAME OF LIBERTY <span class="star">★</span></h1>
-  <div class="sub">Conway&rsquo;s Game of Life &mdash; but it plays the birth of a nation &middot; 8-BIT AMERICA</div>
+  <div class="sub">Repel the redcoat invasion &middot; liberate the nation &middot; 8-BIT AMERICA</div>
+
+  <div class="tug">
+    <div class="p" id="tugP"><span id="tugPt">0%</span></div>
+    <div class="n" id="tugN"></div>
+    <div class="r" id="tugR"><span id="tugRt">0%</span></div>
+  </div>
 
   <div class="stage" id="stage">
     <canvas id="grid" width="640" height="360"></canvas>
+    <div class="flash" id="flash"></div>
+    <div class="overlay" id="overlay">
+      <h2 id="ovTitle">GAME OF LIBERTY</h2>
+      <p id="ovText"></p>
+      <button id="ovBtn">Start the Revolution</button>
+    </div>
   </div>
 
   <div class="hud">
     <span>YEAR <b id="year">1776</b></span>
-    <span>LIBERTY <b id="liberty">0%</b></span>
-    <span>SETTLERS <b id="settlers">0</b></span>
-    <span>BELLS <b id="bells">12</b></span>
-    <span id="status">THE COLONIES STIR...</span>
+    <span>TIME <b id="time">90</b></span>
+    <span>BELLS <b id="bells" class="pips">★★★</b></span>
+    <span>SCORE <b id="score">0</b></span>
+    <span id="status">DEFEND THE HEARTLAND</span>
   </div>
 
   <div class="controls">
-    <button id="play" class="red">Pause</button>
-    <button id="step" class="alt">Step</button>
-    <button id="speed">Speed: 1x</button>
+    <button id="play" class="alt">Pause</button>
+    <button id="restart" class="alt">Restart</button>
     <button id="sound">Sound: On</button>
-    <button id="seed" class="alt">Tea Party</button>
-    <button id="clear" class="alt">Clear</button>
-  </div>
-  <div class="controls stamps">
-    <span style="font-size:11px;opacity:.6;align-self:center;letter-spacing:1px;">PLACE:</span>
-    <button class="stamp on" data-stamp="bell">★ Liberty Bell</button>
-    <button class="stamp" data-stamp="minuteman">Minuteman</button>
-    <button class="stamp" data-stamp="cannon">Cannon</button>
-    <button class="stamp" data-stamp="fireworks">Fireworks</button>
   </div>
 
   <div class="hint">
-    Pick a tool, then click the map. <b>Liberty Bell</b> seeds free settlements; <b>Minuteman</b> (a glider) marches west;
-    <b>Cannon</b> fires an endless column of minutemen; <b>Fireworks</b> pulse on the spot. Reach <b>50% liberty</b> to found the nation.
-    Built for Summer Into AI &mdash; Theme 1: 8-Bit America.
+    <b>Click / tap the map</b> to ring a <b>Liberty Bell</b> — it converts land to Patriots and shoves the front line.
+    Bells recharge over time. Drive every redcoat into the sea before the clock runs out.
   </div>
 
 <script>
 (() => {
   "use strict";
-
-  // ---- Grid --------------------------------------------------------------
   const CELL = 8;
   const canvas = document.getElementById("grid");
   const ctx = canvas.getContext("2d");
-  const COLS = canvas.width / CELL;   // 80
-  const ROWS = canvas.height / CELL;  // 45
-
-  let grid = new Uint8Array(COLS * ROWS);   // 0 empty, 1 settlement (pure Conway)
-  let next = new Uint8Array(COLS * ROWS);
-  let age  = new Uint8Array(COLS * ROWS);
-  let decay = new Uint8Array(COLS * ROWS);  // VISUAL-only redcoat-fall flash; never affects rules
-  let foundedMask = new Uint8Array(COLS * ROWS); // 1 once liberty ever touched (claimed land)
+  const COLS = canvas.width / CELL, ROWS = canvas.height / CELL;
   const idx = (x, y) => y * COLS + x;
 
-  // ---- USA silhouette mask (low-res; scaled up to the grid) --------------
-  // '#' = land, ' ' = ocean. A rough contiguous-US shape so liberty visibly
-  // fills the actual country: wide northern tier, California coast, Texas dip,
-  // Florida peninsula, Maine in the top-right.
+  // ---- USA silhouette ----------------------------------------------------
   const USA = [
     "                                              #  ",
     "  ##                                       ##### ",
@@ -162,304 +121,274 @@
     "          #####                #                  ",
     "           ###                                    ",
   ];
-  const MW = Math.max(...USA.map(r => r.length));
-  const MH = USA.length;
-  // precompute per-grid-cell land flag
+  const MW = Math.max(...USA.map(r => r.length)), MH = USA.length;
   const land = new Uint8Array(COLS * ROWS);
+  const eastEdge = new Int16Array(ROWS).fill(-1); // rightmost land x per row (the coast)
   let landCells = 0;
-  (function buildLand() {
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const mx = Math.floor(x / COLS * MW);
-        const my = Math.floor(y / ROWS * MH);
-        const row = USA[my] || "";
-        const ch = row[mx] || " ";
-        const isL = ch !== " " ? 1 : 0;
-        land[idx(x, y)] = isL;
-        if (isL) landCells++;
-      }
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const ch = (USA[Math.floor(y / ROWS * MH)] || "")[Math.floor(x / COLS * MW)] || " ";
+      if (ch !== " ") { land[idx(x, y)] = 1; landCells++; if (x > eastEdge[y]) eastEdge[y] = x; }
     }
-  })();
+  }
   const isLand = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS && land[idx(x, y)] === 1;
 
-  // ---- State -------------------------------------------------------------
-  let running = true, speed = 1, frame = 0;
-  let bells = 12, peak = 0, year = 1776;
-  let founded = 0, nationFounded = false;
-  let stamp = "bell";
-  const pulses = [];                 // bell ring animations {x,y,t}
+  // ---- State: 0 empty land, 1 patriot, 2 redcoat -------------------------
+  let cell = new Uint8Array(COLS * ROWS);
+  let nextC = new Uint8Array(COLS * ROWS);
+  let flash = new Uint8Array(COLS * ROWS);   // visual spark countdown on a freshly-flipped cell
+  const pulses = [];                          // {x,y,t,col}
   let mouse = { x: -9, y: -9, on: false };
 
-  // ---- Conway patterns (cell offsets) ------------------------------------
-  // Glider that travels SOUTH-WEST (marches "west" into the continent).
-  const GLIDER_W = [[1,0],[0,1],[0,2],[1,2],[2,2]];
-  // Gosper glider gun, mirrored in X so it fires gliders toward the west.
-  const GUN_RAW = [
-    [0,4],[0,5],[1,4],[1,5],
-    [10,4],[10,5],[10,6],[11,3],[11,7],[12,2],[12,8],[13,2],[13,8],[14,5],
-    [15,3],[15,7],[16,4],[16,5],[16,6],[17,5],
-    [20,2],[20,3],[20,4],[21,2],[21,3],[21,4],[22,1],[22,5],[24,0],[24,1],[24,5],[24,6],
-    [34,2],[34,3],[35,2],[35,3],
-  ];
-  const GUN_W = GUN_RAW.map(([x, y]) => [35 - x, y]); // mirror -> fires west
-  // Pulsar (period-3 oscillator) — used as "Fireworks".
-  const PULSAR = [];
-  [[2,0],[3,0],[4,0],[8,0],[9,0],[10,0],
-   [0,2],[5,2],[7,2],[12,2],[0,3],[5,3],[7,3],[12,3],[0,4],[5,4],[7,4],[12,4],
-   [2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
-   [2,7],[3,7],[4,7],[8,7],[9,7],[10,7],
-   [0,8],[5,8],[7,8],[12,8],[0,9],[5,9],[7,9],[12,9],[0,10],[5,10],[7,10],[12,10],
-   [2,12],[3,12],[4,12],[8,12],[9,12],[10,12]].forEach(p => PULSAR.push(p));
+  let running = false, started = false, over = false;
+  let bells = 3; const BELL_MAX = 3;
+  let bellCharge = 0; const RECHARGE = 11;     // ticks per +1 bell
+  let tick = 0, score = 0, patriotCount = 0, redcoatCount = 0;
+  const TICK_RATE = 60 / 7;                    // logic steps per second
+  const TIME_LIMIT = Math.round(90 * TICK_RATE);
+  let waveTick = 0, waveGap = Math.round(7 * TICK_RATE), wavesLanded = 0;
 
-  function place(pattern, ox, oy) {
-    for (const [dx, dy] of pattern) {
-      const x = ox + dx, y = oy + dy;
-      if (x < 0 || y < 0 || x >= COLS || y >= ROWS) continue;
-      grid[idx(x, y)] = 1; age[idx(x, y)] = 1;
-    }
-  }
-
-  // ---- Rendering ---------------------------------------------------------
-  function drawFigure(px, py, body, hat) {
-    ctx.fillStyle = body;
-    ctx.fillRect(px + 1, py + 2, 6, 5); // body
-    ctx.fillStyle = hat;
-    ctx.fillRect(px + 1, py, 6, 2);     // tricorn hat brim
-    ctx.fillRect(px + 3, py - 0, 2, 1); // crown
-  }
-
-  const bellSprite = [
-    "...#...","..###..",".#####.",".#####.","#######","#######","..#.#..",
-  ];
-  function drawBellCursor(px, py) {
-    const s = 2;
-    for (let r = 0; r < bellSprite.length; r++) {
-      for (let c = 0; c < bellSprite[r].length; c++) {
-        if (bellSprite[r][c] !== "#") continue;
-        ctx.fillStyle = (r === 6) ? "#7a161b" : "#e8c34a";
-        ctx.fillRect(px - 7 + c * s, py - 7 + r * s, s, s);
-      }
-    }
-  }
-
-  function draw() {
-    ctx.fillStyle = "#04050a";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const i = idx(x, y), px = x * CELL, py = y * CELL;
-        if (grid[i] === 0) {
-          if (decay[i] > 0) {     // a settlement just fell -> redcoat flash
-            drawFigure(px, py, "#c1272d", "#3a0a0c");
-          } else if (land[i]) {
-            ctx.fillStyle = foundedMask[i] ? "#1c2d5e" : "#0b0f22"; // claimed vs wild land
-            ctx.fillRect(px, py, CELL, CELL);
-          }
-          continue;
-        }
-        // settlement: white spark -> patriot blue -> gold veteran
-        const a = age[i];
-        if (a < 2) { ctx.fillStyle = "#f4f1e8"; ctx.fillRect(px + 1, py + 1, 6, 6); }
-        else if (a < 6) drawFigure(px, py, "#3f63c8", "#0e1a3a");
-        else drawFigure(px, py, "#e8c34a", "#7a5a10");
-      }
-    }
-
-    // bell ring pulses
-    for (const p of pulses) {
-      const r = p.t * 3;
-      ctx.strokeStyle = `rgba(232,195,74,${Math.max(0, 0.7 - p.t * 0.07)})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(p.x * CELL + CELL / 2, p.y * CELL + CELL / 2, r, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // liberty bell cursor
-    if (mouse.on && stamp === "bell") drawBellCursor(mouse.x * CELL + 4, mouse.y * CELL + 4);
-    else if (mouse.on) {
-      ctx.strokeStyle = "rgba(244,241,232,0.6)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(mouse.x * CELL + 0.5, mouse.y * CELL + 0.5, CELL, CELL);
-    }
-  }
-
-  // ---- Simulation (Conway, life only on land) ----------------------------
-  function step() {
-    let alive = 0;
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const i = idx(x, y);
-        if (!land[i]) { next[i] = 0; continue; }   // ocean: never alive -> crisp coastline
-        let n = 0;
-        for (let dy = -1; dy <= 1; dy++)
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const xx = x + dx, yy = y + dy;
-            if (xx < 0 || yy < 0 || xx >= COLS || yy >= ROWS) continue;
-            if (grid[idx(xx, yy)] === 1) n++;
-          }
-        const s = grid[i];
-        // pure Conway: survive on 2-3, born on exactly 3
-        const ns = s === 1 ? (n === 2 || n === 3 ? 1 : 0) : (n === 3 ? 1 : 0);
-        next[i] = ns;
-        if (ns === 1) {
-          alive++;
-          age[i] = (s === 1) ? Math.min(255, age[i] + 1) : 1;
-          decay[i] = 0;
-          if (!foundedMask[i]) { foundedMask[i] = 1; founded++; }
-        } else {
-          age[i] = 0;
-          if (s === 1) decay[i] = 2;          // a settlement just fell -> redcoat flash
-          else if (decay[i] > 0) decay[i]--;  // fade the flash
-        }
-      }
-    }
-    const tmp = grid; grid = next; next = tmp;
-
-    const liberty = Math.min(100, Math.round((founded / landCells) * 100));
-    setLiberty(liberty, alive);
-    if (alive > 0 && frame % 3 === 0) blip(180 + liberty * 7, 0.035);
-    frame++;
-    year = 1776 + Math.floor(frame / 4);
-    document.getElementById("year").textContent = year;
-  }
-
-  // ---- Tools -------------------------------------------------------------
-  function bellBurst(cx, cy, r) {
+  // ---- Setup helpers -----------------------------------------------------
+  function blob(cx, cy, r, who, jitter) {
     for (let dy = -r; dy <= r; dy++)
       for (let dx = -r; dx <= r; dx++) {
         if (dx * dx + dy * dy > r * r) continue;
         const x = cx + dx, y = cy + dy;
         if (!isLand(x, y)) continue;
-        if (Math.abs((dx * 7 + dy * 13 + frame) % 3) === 0) {
-          grid[idx(x, y)] = 1; age[idx(x, y)] = 1;
-        }
+        if (jitter && ((dx * 5 + dy * 9 + x) % 4 === 0)) continue;
+        cell[idx(x, y)] = who; flash[idx(x, y)] = 2;
       }
   }
+  function reset() {
+    cell.fill(0); flash.fill(0); pulses.length = 0;
+    tick = 0; score = 0; bells = BELL_MAX; bellCharge = 0;
+    waveTick = 0; waveGap = Math.round(9 * TICK_RATE); wavesLanded = 0;
+    over = false;
+    // Patriots: one heartland stronghold — you must expand it by ringing bells
+    blob(Math.floor(COLS * 0.32), Math.floor(ROWS * 0.45), 5, 1, false);
+    // Redcoats: a band along the entire east coast (landed from the Atlantic)
+    for (let y = 0; y < ROWS; y++) {
+      if (eastEdge[y] < 0) continue;
+      for (let x = eastEdge[y]; x > eastEdge[y] - 4 && x >= 0; x--)
+        if (isLand(x, y)) cell[idx(x, y)] = 2;
+    }
+    count(); updateHUD(); draw();
+  }
 
-  function applyTool(cx, cy) {
-    if (stamp === "bell") {
-      if (bells <= 0) { setStatus("NO BELLS LEFT — USE A TOOL OR FOUND THE NATION"); return; }
-      bells--; document.getElementById("bells").textContent = bells;
-      bellBurst(cx, cy, 5);
-      pulses.push({ x: cx, y: cy, t: 0 });
-      flashStage();
-      chord([523, 659, 784], 0.18);
-      setStatus("THE BELL RINGS — LIBERTY SPREADS...");
-    } else if (stamp === "minuteman") {
-      place(GLIDER_W, cx - 1, cy - 1);
-      blip(440, 0.06);
-      setStatus("A MINUTEMAN MARCHES WEST");
-    } else if (stamp === "cannon") {
-      place(GUN_W, cx - 18, cy - 4);
-      chord([330, 392, 494], 0.14);
-      setStatus("CANNON EMPLACED — FIRING MINUTEMEN");
-    } else if (stamp === "fireworks") {
-      place(PULSAR, cx - 6, cy - 6);
-      chord([659, 784, 988], 0.12);
-      setStatus("FIREWORKS OVER THE CAPITAL");
+  // ---- Redcoat reinforcement wave (lands on the coast) -------------------
+  function redcoatWave() {
+    const ry = (wavesLanded * 7 + 5) % ROWS;
+    let yy = -1;
+    for (let k = 0; k < ROWS; k++) { const cand = (ry + k) % ROWS; if (eastEdge[cand] >= 0) { yy = cand; break; } }
+    if (yy < 0) return;
+    blob(eastEdge[yy] - 2, yy, 4 + Math.min(3, Math.floor(wavesLanded / 2)), 2, true);
+    wavesLanded++;
+    waveGap = Math.max(Math.round(3.5 * TICK_RATE), waveGap - Math.round(0.4 * TICK_RATE)); // ramp up
+    pulses.push({ x: eastEdge[yy] - 2, y: yy, t: 0, col: "210,43,48" });
+    screenFlash("rgba(209,43,48,0.28)");
+    boom();
+    setStatus("⚑ REDCOATS LANDING ON THE COAST!");
+  }
+
+  // ---- Majority-rule spread (controllable fronts) ------------------------
+  function step() {
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y);
+        if (!land[i]) { nextC[i] = 0; continue; }
+        let P = 0, R = 0;
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue;
+            const xx = x + dx, yy = y + dy;
+            if (!isLand(xx, yy)) continue;
+            const s = cell[idx(xx, yy)];
+            if (s === 1) P++; else if (s === 2) R++;
+          }
+        const cur = cell[i];
+        let ns = cur;
+        if (cur === 0) {                       // neutral land: redcoats FLOOD it; patriots need a strong local presence (your bells)
+          if (R >= 3) ns = 2;
+          else if (P >= 4) ns = 1;
+        } else if (cur === 1) {                // patriots hold unless strongly outnumbered
+          if (R >= P + 3) ns = 2;
+        } else {                               // redcoats yield to local patriot superiority
+          if (P >= R + 2) ns = 1;
+        }
+        nextC[i] = ns;
+        if (ns !== cur) flash[i] = 2;
+        else if (flash[i] > 0) flash[i]--;
+      }
+    }
+    const t = cell; cell = nextC; nextC = t;
+
+    if (bells < BELL_MAX && ++bellCharge >= RECHARGE) { bells++; bellCharge = 0; }
+    if (++waveTick >= waveGap) { waveTick = 0; redcoatWave(); }
+
+    tick++;
+    document.getElementById("year").textContent = 1776 + Math.floor(tick / 6);
+    count(); checkEnd(); updateHUD();
+  }
+
+  function count() {
+    let p = 0, r = 0;
+    for (let i = 0; i < cell.length; i++) { if (cell[i] === 1) p++; else if (cell[i] === 2) r++; }
+    patriotCount = p; redcoatCount = r;
+    score = Math.max(score, Math.round(p * 1.5) + wavesLanded * 5 + Math.floor(tick / 3));
+  }
+
+  function checkEnd() {
+    if (redcoatCount <= 2 && patriotCount > 0) return endGame(true, "Every redcoat is driven into the sea.");
+    if (patriotCount <= 2) return endGame(false, "The Patriots are overrun.");
+    if (TIME_LIMIT - tick <= 0) {
+      if (patriotCount > redcoatCount) endGame(true, "The clock runs out — but Liberty holds the field.");
+      else endGame(false, "The clock runs out — the Crown still holds ground.");
     }
   }
 
-  function flashStage() {
-    const st = document.getElementById("stage");
-    st.classList.remove("liberty-flash"); void st.offsetWidth; st.classList.add("liberty-flash");
+  function endGame(win, reason) {
+    if (over) return;
+    over = true; running = false;
+    const pct = Math.round(patriotCount / landCells * 100);
+    showOverlay(
+      win ? "★ A NEW NATION IS FOUNDED ★" : "THE REVOLUTION IS CRUSHED",
+      `${reason}\n\nLiberty: ${pct}% of the land  ·  Year ${1776 + Math.floor(tick / 6)}  ·  Score ${score}`,
+      win ? "Play Again" : "Try Again"
+    );
+    (win ? fanfare : defeat)();
   }
 
-  // ---- Metrics / win -----------------------------------------------------
-  function setLiberty(v, alive) {
-    document.getElementById("liberty").textContent = v + "%";
-    if (alive > peak) { peak = alive; document.getElementById("settlers").textContent = peak; }
-    if (!nationFounded && v >= 50) {
-      nationFounded = true;
-      setStatus("★ A NEW NATION IS FOUNDED — " + year + " ★");
-      fanfare();
+  // ---- Rendering ---------------------------------------------------------
+  function drawFigure(px, py, body, hat) {
+    ctx.fillStyle = body; ctx.fillRect(px + 1, py + 2, 6, 5);
+    ctx.fillStyle = hat; ctx.fillRect(px + 1, py, 6, 2); ctx.fillRect(px + 3, py, 2, 1);
+  }
+  const bellSprite = ["...#...","..###..",".#####.",".#####.","#######","#######","..#.#.."];
+  function drawBellCursor(px, py) {
+    for (let r = 0; r < bellSprite.length; r++)
+      for (let c = 0; c < bellSprite[r].length; c++)
+        if (bellSprite[r][c] === "#") { ctx.fillStyle = r === 6 ? "#7a161b" : "#e8c34a"; ctx.fillRect(px - 7 + c * 2, py - 7 + r * 2, 2, 2); }
+  }
+  function draw() {
+    ctx.fillStyle = "#04050a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y), px = x * CELL, py = y * CELL;
+        if (!land[i]) continue;
+        const s = cell[i];
+        if (s === 0) { ctx.fillStyle = "#0c1024"; ctx.fillRect(px, py, CELL, CELL); continue; }
+        if (flash[i] >= 2) { ctx.fillStyle = "#f4f1e8"; ctx.fillRect(px + 1, py + 1, 6, 6); continue; }
+        if (s === 1) drawFigure(px, py, "#3f63c8", "#0e1a3a");
+        else drawFigure(px, py, "#d12b30", "#3a0a0c");
+      }
     }
+    for (const p of pulses) {
+      ctx.strokeStyle = `rgba(${p.col},${Math.max(0, 0.7 - p.t * 0.06)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x * CELL + 4, p.y * CELL + 4, p.t * 3.5, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (mouse.on && !over) drawBellCursor(mouse.x * CELL + 4, mouse.y * CELL + 4);
+  }
+
+  // ---- Player action -----------------------------------------------------
+  function ringBell(cx, cy) {
+    if (over || !started) return;
+    if (bells <= 0) { setStatus("THE BELL IS STILL RECASTING..."); dud(); return; }
+    bells--;
+    let converted = 0;
+    const r = 5;
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        const x = cx + dx, y = cy + dy;
+        if (!isLand(x, y)) continue;
+        if (cell[idx(x, y)] !== 1) converted++;
+        cell[idx(x, y)] = 1; flash[idx(x, y)] = 2;
+      }
+    pulses.push({ x: cx, y: cy, t: 0, col: "232,195,74" });
+    score += converted * 2;
+    if (converted > 30) { score += 50; screenFlash("rgba(232,195,74,0.22)"); setStatus("A MIGHTY PEAL — THE LINE SURGES!"); }
+    else setStatus("THE BELL RINGS — LIBERTY SPREADS");
+    shake(); chord([523, 659, 784], 0.16);
+    count(); updateHUD();
+  }
+
+  // ---- HUD / overlay -----------------------------------------------------
+  function updateHUD() {
+    const total = landCells;
+    const pPct = Math.round(patriotCount / total * 100);
+    const rPct = Math.round(redcoatCount / total * 100);
+    document.getElementById("tugP").style.width = pPct + "%";
+    document.getElementById("tugR").style.width = rPct + "%";
+    document.getElementById("tugPt").textContent = pPct + "%";
+    document.getElementById("tugRt").textContent = rPct + "%";
+    document.getElementById("time").textContent = Math.max(0, Math.ceil((TIME_LIMIT - tick) / TICK_RATE));
+    document.getElementById("bells").textContent = "★".repeat(bells) + "·".repeat(BELL_MAX - bells);
+    document.getElementById("score").textContent = score;
   }
   function setStatus(t) { document.getElementById("status").textContent = t; }
+  function showOverlay(title, text, btn) {
+    document.getElementById("ovTitle").textContent = title;
+    document.getElementById("ovText").textContent = text;
+    document.getElementById("ovBtn").textContent = btn;
+    document.getElementById("overlay").classList.remove("hidden");
+  }
+  function hideOverlay() { document.getElementById("overlay").classList.add("hidden"); }
+
+  // ---- Juice -------------------------------------------------------------
+  let flashTimer = 0;
+  function screenFlash(color) { const f = document.getElementById("flash"); f.style.background = color; f.style.opacity = "1"; flashTimer = 8; }
+  function shake() { const s = document.getElementById("stage"); s.classList.remove("shake"); void s.offsetWidth; s.classList.add("shake"); }
 
   // ---- Audio -------------------------------------------------------------
   let audioOn = true, actx = null;
-  function ensureAudio() {
-    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioOn = false; } }
-    if (actx && actx.state === "suspended") actx.resume();
-  }
-  function blip(freq, dur) {
+  function ensureAudio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audioOn = false; } } if (actx && actx.state === "suspended") actx.resume(); }
+  function tone(freq, dur, type) {
     if (!audioOn || !actx) return;
     const o = actx.createOscillator(), g = actx.createGain();
-    o.type = "square"; o.frequency.value = freq; g.gain.value = 0.04;
+    o.type = type || "square"; o.frequency.value = freq; g.gain.value = 0.05;
     g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
-    o.connect(g).connect(actx.destination);
-    o.start(); o.stop(actx.currentTime + dur);
+    o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + dur);
   }
-  function chord(fs, dur) { ensureAudio(); fs.forEach((f, i) => setTimeout(() => blip(f, dur), i * 60)); }
-  function fanfare() { ensureAudio(); [523,659,784,1047,784,1047].forEach((f, i) => setTimeout(() => blip(f, 0.22), i * 120)); }
+  function chord(fs, d) { ensureAudio(); fs.forEach((f, i) => setTimeout(() => tone(f, d), i * 55)); }
+  function boom() { ensureAudio(); tone(70, 0.35, "sawtooth"); tone(48, 0.4, "triangle"); }
+  function dud() { tone(150, 0.08); }
+  function fanfare() { ensureAudio(); [523, 659, 784, 1047, 880, 1047, 1319].forEach((f, i) => setTimeout(() => tone(f, 0.24), i * 130)); }
+  function defeat() { ensureAudio(); [392, 330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, 0.35, "triangle"), i * 200)); }
 
   // ---- Input -------------------------------------------------------------
-  function cellFromEvent(clientX, clientY) {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: Math.floor(((clientX - rect.left) / rect.width) * COLS),
-      y: Math.floor(((clientY - rect.top) / rect.height) * ROWS),
-    };
+  function cellFromEvent(cx, cy) {
+    const r = canvas.getBoundingClientRect();
+    return { x: Math.floor((cx - r.left) / r.width * COLS), y: Math.floor((cy - r.top) / r.height * ROWS) };
   }
-  canvas.addEventListener("mousemove", (e) => {
-    const c = cellFromEvent(e.clientX, e.clientY); mouse = { x: c.x, y: c.y, on: true };
-  });
-  canvas.addEventListener("mouseleave", () => { mouse.on = false; });
-  canvas.addEventListener("click", (e) => { ensureAudio(); const c = cellFromEvent(e.clientX, e.clientY); applyTool(c.x, c.y); });
-  // touch support
-  canvas.addEventListener("touchstart", (e) => {
-    e.preventDefault(); ensureAudio();
-    const t = e.changedTouches[0]; const c = cellFromEvent(t.clientX, t.clientY);
-    mouse = { x: c.x, y: c.y, on: true }; applyTool(c.x, c.y);
-  }, { passive: false });
+  canvas.addEventListener("mousemove", e => { const c = cellFromEvent(e.clientX, e.clientY); mouse = { x: c.x, y: c.y, on: true }; });
+  canvas.addEventListener("mouseleave", () => mouse.on = false);
+  canvas.addEventListener("click", e => { ensureAudio(); const c = cellFromEvent(e.clientX, e.clientY); ringBell(c.x, c.y); });
+  canvas.addEventListener("touchstart", e => { e.preventDefault(); ensureAudio(); const t = e.changedTouches[0]; const c = cellFromEvent(t.clientX, t.clientY); mouse = { x: c.x, y: c.y, on: true }; ringBell(c.x, c.y); }, { passive: false });
 
-  // ---- Buttons -----------------------------------------------------------
-  document.getElementById("play").addEventListener("click", (e) => { running = !running; e.target.textContent = running ? "Pause" : "Play"; });
-  document.getElementById("step").addEventListener("click", () => { step(); draw(); });
-  document.getElementById("speed").addEventListener("click", (e) => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; e.target.textContent = "Speed: " + speed + "x"; });
-  document.getElementById("sound").addEventListener("click", (e) => { audioOn = !audioOn; if (audioOn) ensureAudio(); e.target.textContent = "Sound: " + (audioOn ? "On" : "Off"); });
-  document.getElementById("seed").addEventListener("click", () => {
-    for (let i = 0; i < grid.length; i++) { grid[i] = (land[i] && Math.random() < 0.32) ? 1 : 0; age[i] = grid[i]; }
-    setStatus("BOSTON TEA PARTY — CHAOS SEEDED"); chord([392, 494, 587], 0.15);
-  });
-  document.getElementById("clear").addEventListener("click", () => {
-    grid.fill(0); age.fill(0); decay.fill(0); foundedMask.fill(0);
-    founded = 0; nationFounded = false; peak = 0;
-    document.getElementById("settlers").textContent = "0";
-    document.getElementById("liberty").textContent = "0%";
-    setStatus("THE REDCOATS HAVE CLEARED THE MAP"); blip(110, 0.3);
-  });
-  document.querySelectorAll(".stamp").forEach(btn => btn.addEventListener("click", () => {
-    stamp = btn.dataset.stamp;
-    document.querySelectorAll(".stamp").forEach(b => b.classList.toggle("on", b === btn));
-  }));
+  function startGame() { ensureAudio(); reset(); started = true; running = true; over = false; hideOverlay(); document.getElementById("play").textContent = "Pause"; setStatus("DEFEND THE HEARTLAND"); }
+  document.getElementById("play").addEventListener("click", e => { if (over || !started) return; running = !running; e.target.textContent = running ? "Pause" : "Play"; });
+  document.getElementById("restart").addEventListener("click", startGame);
+  document.getElementById("ovBtn").addEventListener("click", startGame);
+  document.getElementById("sound").addEventListener("click", e => { audioOn = !audioOn; if (audioOn) ensureAudio(); e.target.textContent = "Sound: " + (audioOn ? "On" : "Off"); });
 
-  // ---- Main loop ---------------------------------------------------------
-  let acc = 0;
-  function loop() {
-    acc++;
-    if (running && acc % 8 === 0) for (let s = 0; s < speed; s++) step();
+  // ---- Loops -------------------------------------------------------------
+  // Game logic on a fixed timestep (setInterval keeps running even if the tab
+  // is briefly backgrounded); rendering on requestAnimationFrame.
+  setInterval(() => { if (running && !over) step(); }, Math.round(1000 / TICK_RATE));
+  function render() {
     for (let k = pulses.length - 1; k >= 0; k--) { pulses[k].t++; if (pulses[k].t > 12) pulses.splice(k, 1); }
+    if (flashTimer > 0 && --flashTimer === 0) document.getElementById("flash").style.opacity = "0";
     draw();
-    requestAnimationFrame(loop);
+    requestAnimationFrame(render);
   }
+  const loop = render;
 
-  // ---- Boot: the whole nation stirs to life (dense scatter) + a perpetual --
-  // cannon marching west, so the opening loop is both rich AND never freezes.
-  function boot() {
-    for (let i = 0; i < grid.length; i++) {
-      grid[i] = (land[i] && Math.random() < 0.30) ? 1 : 0;
-      age[i] = grid[i];
-      if (grid[i]) { foundedMask[i] = 1; founded++; }
-    }
-    setStatus("THE THIRTEEN COLONIES STIR...");
-    draw(); loop();
-  }
-  boot();
+  // ---- Boot --------------------------------------------------------------
+  reset();
+  showOverlay("★ GAME OF LIBERTY ★",
+    "The British have landed on the eastern seaboard. You hold the heartland.\n\nRing Liberty Bells to rally Patriots and drive every redcoat back into the sea before the clock runs out.",
+    "Start the Revolution");
+  loop();
 })();
 </script>
 </body>

@@ -80,7 +80,7 @@ Write a public post and **tag @advisoryhour**, including:
 
 | Week | Dates | Theme | Our build | Status |
 |---|---|---|---|---|
-| 1 | Mon Jun 15 → Sun Jun 21, 2026 | **8-Bit America** | `week-1/` — **Game of Liberty** (Conway's Life as the founding of America) | Built ✅ · publish before midnight Jun 21 |
+| 1 | Mon Jun 15 → Sun Jun 21, 2026 | **8-Bit America** | `week-1/` — **Game of Liberty** (8-bit territory battle: repel the redcoat invasion) | Built ✅ · publish before midnight Jun 21 |
 | 2 | Jun 22 → Jun 28 | *(drops Mon Jun 22)* | — | — |
 
 ## 7. Competitor watch (seen so far)
