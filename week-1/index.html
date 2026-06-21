@@ -137,8 +137,11 @@
   let cell = new Uint8Array(COLS * ROWS);
   let nextC = new Uint8Array(COLS * ROWS);
   let flash = new Uint8Array(COLS * ROWS);   // visual spark countdown on a freshly-flipped cell
+  let surge = new Uint8Array(COLS * ROWS);   // bell "push" timer: surged patriots advance into the enemy
   const pulses = [];                          // {x,y,t,col}
   let mouse = { x: -9, y: -9, on: false };
+  const DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[-1,-1],[1,-1],[-1,1]];
+  const SURGE = 14;                           // ticks a bell-converted cell keeps pushing
 
   let running = false, started = false, over = false;
   let bells = 3; const BELL_MAX = 3;
@@ -160,7 +163,7 @@
       }
   }
   function reset() {
-    cell.fill(0); flash.fill(0); pulses.length = 0;
+    cell.fill(0); flash.fill(0); surge.fill(0); pulses.length = 0;
     tick = 0; score = 0; bells = BELL_MAX; bellCharge = 0;
     waveTick = 0; waveGap = Math.round(9 * TICK_RATE); wavesLanded = 0;
     over = false;
@@ -224,6 +227,26 @@
       }
     }
     const t = cell; cell = nextC; nextC = t;
+
+    // --- living fronts: redcoats raid the line (never freezes); bell surges push liberty outward ---
+    const raidP = patriotCount > redcoatCount ? 0.06 : 0.03; // the Crown presses harder when it's losing ground
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = idx(x, y), s = cell[i];
+        if (s === 2) {                          // redcoat raids an adjacent patriot
+          if (Math.random() < raidP) {
+            const d = DIRS[(x * 3 + y * 7 + tick) & 7], xx = x + d[0], yy = y + d[1];
+            if (isLand(xx, yy) && cell[idx(xx, yy)] === 1) { cell[idx(xx, yy)] = 2; flash[idx(xx, yy)] = 2; }
+          }
+        } else if (s === 1 && surge[i] > 0) {   // bell surge pushes liberty into the enemy
+          if (Math.random() < 0.5) {
+            const d = DIRS[(x * 5 + y * 3 + tick) & 7], xx = x + d[0], yy = y + d[1];
+            if (isLand(xx, yy) && cell[idx(xx, yy)] !== 1) { cell[idx(xx, yy)] = 1; flash[idx(xx, yy)] = 2; surge[idx(xx, yy)] = Math.max(surge[idx(xx, yy)], surge[i] - 3); }
+          }
+        }
+      }
+    }
+    for (let i = 0; i < surge.length; i++) if (surge[i] > 0) surge[i]--;
 
     if (bells < BELL_MAX && ++bellCharge >= RECHARGE) { bells++; bellCharge = 0; }
     // rubber-band: when the Patriots pull ahead, the Crown rushes reinforcements faster
@@ -307,7 +330,7 @@
         const x = cx + dx, y = cy + dy;
         if (!isLand(x, y)) continue;
         if (cell[idx(x, y)] !== 1) converted++;
-        cell[idx(x, y)] = 1; flash[idx(x, y)] = 2;
+        cell[idx(x, y)] = 1; flash[idx(x, y)] = 2; surge[idx(x, y)] = SURGE;
       }
     pulses.push({ x: cx, y: cy, t: 0, col: "232,195,74" });
     score += converted * 2;
