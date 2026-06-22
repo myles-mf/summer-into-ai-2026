@@ -7,50 +7,83 @@
 <style>
   :root { --red:#c1272d; --white:#f4f1e8; --blue:#2a3f7a; --gold:#e8c34a; --ink:#07080f; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  html,body { height:100%; }
+  html,body { min-height:100%; }
   body {
     background:var(--ink); color:var(--white); font-family:"Courier New",monospace;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:24px; padding:24px; text-align:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    gap:22px; padding:40px 24px; text-align:center;
   }
   h1 { font-size:clamp(20px,5vw,36px); letter-spacing:3px;
        text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue); }
   h1 .star { color:var(--gold); }
   .sub { opacity:.7; letter-spacing:1px; font-size:13px; max-width:520px; }
-  .weeks { display:flex; flex-direction:column; gap:14px; width:100%; max-width:520px; }
+  .weeks { display:flex; flex-direction:column; gap:18px; width:100%; max-width:560px; }
+
+  details.weekgroup { width:100%; }
+  details.weekgroup > summary {
+    cursor:pointer; list-style:none; user-select:none;
+    display:flex; align-items:center; gap:10px;
+    color:var(--gold); letter-spacing:2px; font-size:13px; font-weight:bold;
+    padding:10px 14px; border:2px solid var(--gold); background:#0b0f22;
+    text-align:left; transition:background .15s;
+  }
+  details.weekgroup > summary:hover { background:#11183a; }
+  details.weekgroup > summary::-webkit-details-marker { display:none; }
+  details.weekgroup > summary::before {
+    content:"▶"; font-size:10px; color:var(--gold); transition:transform .15s; display:inline-block;
+  }
+  details.weekgroup[open] > summary::before { transform:rotate(90deg); }
+  summary .count { margin-left:auto; opacity:.6; font-weight:normal; letter-spacing:1px; font-size:11px; }
+
+  .grouplist { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
   a.week {
     display:block; text-decoration:none; color:var(--white);
-    border:3px solid var(--gold); background:#0b0f22; padding:18px 20px;
+    border:3px solid var(--gold); background:#0b0f22; padding:16px 18px;
     text-align:left; transition:transform .08s, background .15s;
   }
   a.week:hover { background:#11183a; transform:translateY(-2px); }
-  a.week .wk { color:var(--gold); letter-spacing:2px; font-size:12px; }
-  a.week .title { font-size:18px; margin-top:6px; }
-  a.week .desc { opacity:.65; font-size:12px; margin-top:4px; }
-  .foot { opacity:.5; font-size:11px; }
+  a.week .title { font-size:18px; }
+  a.week .desc { opacity:.65; font-size:12px; margin-top:5px; line-height:1.5; }
+  .foot { opacity:.5; font-size:11px; margin-top:8px; }
   .foot a { color:var(--gold); }
 </style>
 </head>
 <body>
   <h1><span class="star">★</span> SUMMER INTO AI 2026 <span class="star">★</span></h1>
   <div class="sub">Competition #2 &middot; weekly AI builds, shipped in public for <b>@advisoryhour</b>.</div>
+
   <div class="weeks">
-    <a class="week" href="week-1/">
-      <div class="wk">WEEK 1 &middot; 8-BIT AMERICA</div>
-      <div class="title">★ Game of Liberty</div>
-      <div class="desc">An 8-bit territory battle &mdash; repel the redcoat invasion and liberate the USA.</div>
-    </a>
-    <a class="week" href="week-1/anthem/">
-      <div class="wk">WEEK 1 &middot; 8-BIT AMERICA</div>
-      <div class="title">★ Liberty Chiptune</div>
-      <div class="desc">An 8-bit anthem maker &mdash; paint a tune on the sequencer, hear it sing, share it.</div>
-    </a>
-    <a class="week" href="https://summer-into-ai-2026.vercel.app/">
-      <div class="wk">WEEK 1 &middot; 8-BIT AMERICA</div>
-      <div class="title">★ Founding Father A.I.</div>
-      <div class="desc">Chat with an 8-bit Franklin, Washington, Jefferson, or Abigail Adams &mdash; a real AI answers back.</div>
-    </a>
+
+    <details class="weekgroup" open>
+      <summary>WEEK 2 &middot; INDEPENDENCE ENGINES <span class="count">1 build</span></summary>
+      <div class="grouplist">
+        <a class="week" href="week-2/">
+          <div class="title">★ Dependency Day</div>
+          <div class="desc">A systems puzzle &mdash; cut the Crown's supply lines so independence <i>cascades</i>, then secure each free state before it's re-garrisoned. Freedom is the win condition.</div>
+        </a>
+      </div>
+    </details>
+
+    <details class="weekgroup">
+      <summary>WEEK 1 &middot; 8-BIT AMERICA <span class="count">3 builds</span></summary>
+      <div class="grouplist">
+        <a class="week" href="week-1/">
+          <div class="title">★ Game of Liberty</div>
+          <div class="desc">An 8-bit territory battle &mdash; repel the redcoat invasion and liberate the USA.</div>
+        </a>
+        <a class="week" href="week-1/anthem/">
+          <div class="title">★ Liberty Chiptune</div>
+          <div class="desc">An 8-bit anthem maker &mdash; paint a tune on the sequencer, hear it sing, share it.</div>
+        </a>
+        <a class="week" href="https://summer-into-ai-2026.vercel.app/">
+          <div class="title">★ Founding Father A.I.</div>
+          <div class="desc">Chat with an 8-bit Franklin, Washington, Jefferson, or Abigail Adams &mdash; a real AI answers back.</div>
+        </a>
+      </div>
+    </details>
+
   </div>
-  <div class="foot">Rules &amp; scoring: <a href="https://github.com/">COMPETITION.md</a> in this repo.</div>
+
+  <div class="foot">Rules &amp; scoring: <a href="https://github.com/myles-mf/summer-into-ai-2026/blob/main/COMPETITION.md">COMPETITION.md</a> in this repo.</div>
 </body>
 </html>

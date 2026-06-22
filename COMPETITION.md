@@ -81,7 +81,7 @@ Write a public post and **tag @advisoryhour**, including:
 | Week | Dates | Theme | Our build | Status |
 |---|---|---|---|---|
 | 1 | Mon Jun 15 → Sun Jun 21, 2026 | **8-Bit America** | **3 entries — all Published ✅** · (a) **Game of Liberty** — territory-battle game (`week-1/`); (b) **Liberty Chiptune** — 8-bit anthem maker (`week-1/anthem/`); (c) **Founding Father A.I.** — real-LLM chat (`week-1/founding-father/`, deployed on Vercel) | All on merlinforge.substack.com; all tag @advisoryhour. Competitor refs across posts: Adam's Paul Revere, Megaman 1776, Timestorm Baseball, British Kraken |
-| 2 | Jun 22 → Jun 28 | *(drops Mon Jun 22)* | — | ⚡ **Be first to submit** = first-submission bonus (we missed it in W1). Watch for the theme drop. |
+| 2 | Jun 22 → Jun 28 | **Independence Engines** ("Red, White, Boom!") — *"independence is not just a symbol…it's a mechanic."* | **Dependency Day** — a systems/strategy puzzle: cut the Crown's supply lines so colonies disconnect and independence *cascades*; secure free clusters (2+ free neighbors) to lock them in permanently before the Crown re-garrisons. `week-2/index.html`, self-contained canvas. Different *shape* (systems puzzle vs. the field's fireworks/town builds). | ⚡ Entry #1 — shipped fast for the first-submission bonus. Autonomous Agent planned as stacking entry #2. |
 
 ## 7. Competitor watch (seen so far)
 

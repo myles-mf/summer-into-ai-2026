@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dependency Day — Summer Into AI 2026 · Week 2</title>
+<style>
+  :root{
+    --red:#c1272d; --white:#f4f1e8; --blue:#2a3f7a; --gold:#e8c34a;
+    --ink:#07080f; --panel:#0b0f22; --panel2:#11183a;
+    --free:#4f9be8; --secure:#e8c34a; --dep:#c1272d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(1200px 700px at 70% 15%, #131a3a 0%, var(--ink) 60%),
+      var(--ink);
+    color:var(--white); font-family:"Courier New",monospace;
+    display:flex; flex-direction:column; align-items:center;
+    min-height:100%; padding:14px; gap:10px;
+  }
+  h1{font-size:clamp(18px,4.4vw,30px); letter-spacing:2px; text-align:center;
+     text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue);}
+  h1 .star{color:var(--gold);}
+  .tag{opacity:.65;font-size:12px;letter-spacing:1px;text-align:center;max-width:680px;}
+  .tag b{color:var(--gold);}
+  .hud{
+    width:100%; max-width:760px; display:flex; flex-wrap:wrap; gap:8px;
+    justify-content:space-between; align-items:stretch;
+  }
+  .stat{
+    flex:1 1 110px; border:2px solid var(--gold); background:var(--panel);
+    padding:7px 9px; min-width:104px;
+  }
+  .stat .k{font-size:10px; letter-spacing:1.5px; opacity:.7;}
+  .stat .v{font-size:18px; margin-top:2px; color:var(--gold);}
+  .stat .v small{font-size:11px;opacity:.7;color:var(--white);}
+  .powbar{height:5px;margin-top:5px;background:#0a0d1c;border:1px solid #2a345e;}
+  .powbar i{display:block;height:100%;background:var(--gold);width:0%;}
+  .wrap{
+    position:relative; width:100%; max-width:760px;
+    border:3px solid var(--gold); background:#070b18;
+  }
+  canvas{display:block; width:100%; height:auto; touch-action:manipulation; cursor:crosshair;}
+  .overlay{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; gap:14px;
+    background:rgba(5,7,15,.93); padding:22px;
+  }
+  .overlay.hidden{display:none;}
+  .overlay h2{font-size:clamp(20px,5vw,34px); letter-spacing:2px;
+     text-shadow:2px 2px 0 var(--red);}
+  .overlay h2.win{color:var(--gold); text-shadow:2px 2px 0 var(--blue);}
+  .overlay p{max-width:520px; font-size:13px; line-height:1.6; opacity:.9;}
+  .overlay .how{text-align:left; max-width:540px; font-size:12.5px; line-height:1.7;
+     border-left:3px solid var(--gold); padding-left:12px; opacity:.92;}
+  .overlay .how b{color:var(--gold);}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 16px;justify-content:center;font-size:11px;opacity:.85;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #000;}
+  button{
+    font-family:inherit; cursor:pointer; color:var(--ink); background:var(--gold);
+    border:none; padding:11px 26px; font-size:15px; font-weight:bold; letter-spacing:1px;
+    text-transform:uppercase; box-shadow:3px 3px 0 #8a6f17;
+  }
+  button:active{transform:translate(2px,2px); box-shadow:1px 1px 0 #8a6f17;}
+  .ghostbtn{background:transparent;color:var(--gold);border:2px solid var(--gold);box-shadow:none;
+     padding:7px 16px;font-size:12px;}
+  .toast{
+    position:absolute; left:50%; top:12px; transform:translateX(-50%);
+    background:rgba(11,15,34,.95); border:2px solid var(--gold); color:var(--white);
+    padding:7px 14px; font-size:12.5px; letter-spacing:.5px; pointer-events:none;
+    opacity:0; transition:opacity .25s; white-space:nowrap; max-width:92%;
+  }
+  .toast.show{opacity:1;}
+  .foot{opacity:.5;font-size:11px;text-align:center;}
+  .foot a{color:var(--gold);}
+  .topbtns{display:flex;gap:8px;}
+</style>
+</head>
+<body>
+  <h1><span class="star">★</span> DEPENDENCY DAY <span class="star">★</span></h1>
+  <div class="tag">Thirteen colonies are <b>chained to the Crown</b> by supply lines. Cut the lines, break the dependency, and lock in each free state before the Crown re-garrisons. Independence isn't a symbol here — it's the win condition. · <b>Week 2 · Independence Engines</b></div>
+
+  <div class="hud">
+    <div class="stat"><div class="k">INDEPENDENT</div><div class="v" id="indStat">0 <small>/ 13</small></div></div>
+    <div class="stat"><div class="k">POWDER</div><div class="v" id="powStat">0</div><div class="powbar"><i id="powFill"></i></div></div>
+    <div class="stat"><div class="k">CROWN HOLDS</div><div class="v" id="crownStat">13</div></div>
+    <div class="stat"><div class="k">TIME LEFT</div><div class="v" id="timeStat">1:40</div></div>
+  </div>
+
+  <div class="wrap">
+    <canvas id="game" width="760" height="620"></canvas>
+    <div class="toast" id="toast"></div>
+
+    <div class="overlay" id="startOv">
+      <h2>DEPENDENCY DAY</h2>
+      <div class="how">
+        <b>★ The board:</b> the gold <b>Crown</b> rules 13 red colonies through <b>supply lines</b>.<br>
+        <b>★ Cut a line</b> (click it) to sever it — each cut costs <b>1 Powder</b>.<br>
+        <b>★ Cut every link back to the Crown</b> and a colony goes <b style="color:var(--free)">free</b> (blue). One good cut can free a whole chain at once.<br>
+        <b>★ Lock it in:</b> a free colony with <b>2+ free neighbors</b> (or one already-secured neighbor) becomes <b style="color:var(--secure)">secured</b> (gold). Secured states are <b>permanent</b> — and they wall the Crown out for good.<br>
+        <b>★ The Crown re-garrisons:</b> any cut line that <b>isn't held by a secured colony</b> grows back in a few seconds (watch it refill). If it reconnects an un-secured colony, the Crown retakes it. So finish a region and secure it <b>before the line heals</b>.<br>
+        <b>★ The engine:</b> every secured state resupplies you — Powder regenerates faster the more you've locked in.<br>
+        <b>★ Win:</b> make all 13 colonies <b>independent (secured)</b> before time runs out.
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--dep)"></i>Dependent</span>
+        <span><i class="dot" style="background:var(--free)"></i>Free (can be retaken)</span>
+        <span><i class="dot" style="background:var(--secure)"></i>Secured (permanent)</span>
+      </div>
+      <button id="startBtn">Declare Independence</button>
+    </div>
+
+    <div class="overlay hidden" id="endOv">
+      <h2 id="endTitle">—</h2>
+      <p id="endMsg">—</p>
+      <button id="againBtn">Play Again</button>
+    </div>
+  </div>
+
+  <div class="topbtns">
+    <button class="ghostbtn" id="muteBtn">🔊 Sound: On</button>
+    <button class="ghostbtn" id="howBtn">How to play</button>
+  </div>
+
+  <div class="foot">
+    Built for <b>@advisoryhour</b> · <a href="../">↩ all entries</a> ·
+    <a href="https://github.com/myles-mf/summer-into-ai-2026/blob/main/week-2/index.html" target="_blank" rel="noopener">view source</a>
+  </div>
+
+<script>
+"use strict";
+(function(){
+  // ---------- Tunables (balanced via headless simulation) ----------
+  const W = 760, H = 620;
+  const START_POWDER = 3, POWDER_CAP = 5;
+  const REGEN_BASE = 0.14, REGEN_PER_SECURED = 0.05; // powder / sec — the independence engine
+  const HEAL_MS = 6000;          // a cut line re-garrisons after this, unless held by a secured colony
+  const GAME_MS = 100000;        // 1:40
+
+  // ---------- Board ----------
+  const CROWN = { id:"CROWN", name:"THE CROWN", x:618, y:300, crown:true };
+  const COLONIES = [
+    {id:"NH", name:"New Hampshire",  x:250, y:72 },
+    {id:"MA", name:"Massachusetts",  x:305, y:120},
+    {id:"RI", name:"Rhode Island",   x:352, y:168},
+    {id:"CT", name:"Connecticut",    x:288, y:178},
+    {id:"NY", name:"New York",       x:232, y:222},
+    {id:"NJ", name:"New Jersey",     x:308, y:262},
+    {id:"PA", name:"Pennsylvania",   x:230, y:300},
+    {id:"DE", name:"Delaware",       x:322, y:322},
+    {id:"MD", name:"Maryland",       x:268, y:356},
+    {id:"VA", name:"Virginia",       x:248, y:420},
+    {id:"NC", name:"North Carolina", x:306, y:470},
+    {id:"SC", name:"South Carolina", x:270, y:520},
+    {id:"GA", name:"Georgia",        x:232, y:566},
+  ];
+  // 7 royal garrisons + the colonial mesh.
+  const EDGE_DEFS = [
+    ["CROWN","MA"],["CROWN","NY"],["CROWN","PA"],["CROWN","MD"],
+    ["CROWN","VA"],["CROWN","SC"],["CROWN","GA"],
+    ["NH","MA"],["MA","RI"],["MA","CT"],["RI","CT"],["CT","NY"],
+    ["NY","NJ"],["NY","PA"],["NJ","PA"],["PA","DE"],["PA","MD"],
+    ["DE","MD"],["MD","VA"],["VA","NC"],["NC","SC"],["SC","GA"],
+  ];
+
+  // ---------- State ----------
+  const cv = document.getElementById("game");
+  const ctx = cv.getContext("2d");
+  const nodes = {};
+  let edges = [], adj = {};
+  let running=false, won=false, lost=false;
+  let powder=0, freeCount=0, securedCount=0, timeLeft=0;
+  let lastTs=0, pulse=0;
+  let flashUntil={};   // colonyId -> ms (retake flash)
+
+  const ek=(a,b)=> a<b ? a+"|"+b : b+"|"+a;
+
+  function buildGraph(){
+    Object.keys(nodes).forEach(k=>delete nodes[k]);
+    nodes[CROWN.id] = Object.assign({}, CROWN);
+    COLONIES.forEach(c=> nodes[c.id] = Object.assign({free:false, secured:false}, c));
+    edges = EDGE_DEFS.map(([a,b])=>({a,b,cut:false,heal:0,key:ek(a,b)}));
+    adj = {}; COLONIES.forEach(c=> adj[c.id]=[]);
+    EDGE_DEFS.forEach(([a,b])=>{ if(a!=="CROWN"&&b!=="CROWN"){ adj[a].push(b); adj[b].push(a); } });
+  }
+
+  // Reachable from Crown over active edges, never routing into/through a secured colony.
+  function reachableFromCrown(){
+    const seen=new Set(["CROWN"]), st=["CROWN"], nbr={};
+    Object.keys(nodes).forEach(id=> nbr[id]=[]);
+    edges.forEach(e=>{ if(!e.cut){ nbr[e.a].push(e.b); nbr[e.b].push(e.a); } });
+    while(st.length){
+      const c=st.pop();
+      for(const n of nbr[c]){
+        if(seen.has(n)) continue;
+        if(nodes[n].secured) continue;
+        seen.add(n); st.push(n);
+      }
+    }
+    return seen;
+  }
+
+  function recompute(){
+    const before={};
+    COLONIES.forEach(c=> before[c.id]=nodes[c.id].free);
+    const reach=reachableFromCrown();
+    COLONIES.forEach(c=>{
+      const n=nodes[c.id];
+      if(n.secured){ n.free=true; return; }
+      n.free=!reach.has(c.id);
+    });
+    // ratchet: free colony locks in if it has 2+ free neighbors OR a secured neighbor (degree-1 inherits)
+    for(let p=0;p<6;p++){
+      COLONIES.forEach(c=>{
+        const n=nodes[c.id];
+        if(n.free && !n.secured){
+          let f=0,s=0;
+          for(const x of adj[c.id]){ if(nodes[x].free) f++; if(nodes[x].secured) s++; }
+          if(f>=2 || s>=1) n.secured=true;
+        }
+      });
+    }
+    const freed=[], secured=[], retaken=[];
+    COLONIES.forEach(c=>{
+      if(nodes[c.id].free && !before[c.id]) freed.push(c.id);
+      if(!nodes[c.id].free && before[c.id]) retaken.push(c.id);
+    });
+    freeCount = COLONIES.filter(c=>nodes[c.id].free).length;
+    securedCount = COLONIES.filter(c=>nodes[c.id].secured).length;
+    return {freed, retaken};
+  }
+
+  const heldBySecured = (e)=> (nodes[e.a]&&nodes[e.a].secured) || (nodes[e.b]&&nodes[e.b].secured);
+
+  // ---------- Audio ----------
+  let actx=null, muted=false;
+  function beep(freq,dur,type,vol){
+    if(muted) return;
+    try{
+      if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+      const o=actx.createOscillator(), g=actx.createGain();
+      o.type=type||"square"; o.frequency.value=freq; g.gain.value=vol||0.06;
+      o.connect(g); g.connect(actx.destination);
+      const t=actx.currentTime; o.start(t);
+      g.gain.setValueAtTime(g.gain.value,t);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.12)); o.stop(t+(dur||0.12));
+    }catch(e){}
+  }
+  const chord=(fs,d)=> fs.forEach((f,i)=> setTimeout(()=>beep(f,d,"square",0.05), i*70));
+  const sndCut    = ()=> beep(160,0.07,"square",0.07);
+  const sndFree   = ()=> chord([523,659,784],0.16);
+  const sndSecure = ()=> chord([392,587,784,1046],0.14);
+  const sndRetake = ()=> { beep(220,0.12,"sawtooth",0.06); setTimeout(()=>beep(165,0.16,"sawtooth",0.06),90); };
+  const sndWin    = ()=> [523,659,784,1046,784,1046,1318].forEach((f,i)=>setTimeout(()=>beep(f,0.2,"square",0.06),i*150));
+  const sndLose   = ()=> [330,294,247,196].forEach((f,i)=>setTimeout(()=>beep(f,0.25,"sawtooth",0.06),i*180));
+
+  // ---------- Toast ----------
+  const toastEl=document.getElementById("toast"); let toastT=null;
+  function toast(msg,ms){ toastEl.textContent=msg; toastEl.classList.add("show");
+    clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove("show"), ms||1700); }
+
+  // ---------- Input ----------
+  function canvasPoint(evt){
+    const r=cv.getBoundingClientRect();
+    const px=(evt.touches?evt.touches[0].clientX:evt.clientX)-r.left;
+    const py=(evt.touches?evt.touches[0].clientY:evt.clientY)-r.top;
+    return { x:px*(W/r.width), y:py*(H/r.height) };
+  }
+  function distToSeg(p,a,b){
+    const dx=b.x-a.x, dy=b.y-a.y, l2=dx*dx+dy*dy;
+    if(l2===0) return Math.hypot(p.x-a.x,p.y-a.y);
+    let t=((p.x-a.x)*dx+(p.y-a.y)*dy)/l2; t=Math.max(0,Math.min(1,t));
+    return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+  }
+  function edgeAt(p){
+    let best=null,bd=11;
+    for(const e of edges){ if(e.cut) continue;
+      const d=distToSeg(p,nodes[e.a],nodes[e.b]); if(d<bd){bd=d;best=e;} }
+    return best;
+  }
+  let hoverKey=null;
+  cv.addEventListener("mousemove",(evt)=>{ if(!running) return;
+    const e=edgeAt(canvasPoint(evt)); hoverKey=e?e.key:null;
+    cv.style.cursor=e?"pointer":"crosshair"; });
+  function tryCut(evt){
+    if(!running) return; evt.preventDefault();
+    const e=edgeAt(canvasPoint(evt)); if(!e) return;
+    if(powder<1){ toast("Out of Powder — secure more states to resupply."); return; }
+    powder-=1; e.cut=true; e.heal=0; sndCut();
+    const {freed}=recompute();
+    if(freed.length){
+      const newlySecured=freed.filter(id=>nodes[id].secured);
+      if(newlySecured.length) sndSecure(); else sndFree();
+      if(freed.length>=3) toast("Independence cascades! "+freed.length+" colonies break free.");
+      else toast(freed.join(", ")+" declares independence!");
+    }
+    syncHUD();
+  }
+  cv.addEventListener("click",tryCut);
+  cv.addEventListener("touchstart",tryCut,{passive:false});
+
+  // ---------- HUD ----------
+  const indStat=document.getElementById("indStat"), powStat=document.getElementById("powStat"),
+        powFill=document.getElementById("powFill"), crownStat=document.getElementById("crownStat"),
+        timeStat=document.getElementById("timeStat");
+  function syncHUD(){
+    indStat.innerHTML=securedCount+' <small>/ 13</small>';
+    powStat.textContent=Math.floor(powder);
+    powFill.style.width=Math.max(0,Math.min(100,(powder/POWDER_CAP)*100))+"%";
+    crownStat.textContent=(13-securedCount);
+    const s=Math.max(0,Math.ceil(timeLeft/1000));
+    timeStat.textContent=Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+  }
+
+  // ---------- Loop ----------
+  function tick(now){
+    if(!running) return;
+    const dt=Math.min(250, now-lastTs); lastTs=now;
+    // heal: cut lines re-garrison unless a secured colony holds them
+    let retook=[];
+    let changed=false;
+    edges.forEach(e=>{
+      if(!e.cut) return;
+      if(heldBySecured(e)){ e.heal=0; return; }
+      e.heal+=dt;
+      // flash at-risk colonies as the line nears regrowth
+      if(e.heal > HEAL_MS-1600){
+        [e.a,e.b].forEach(id=>{ if(nodes[id]&&nodes[id].free&&!nodes[id].secured) flashUntil[id]=now+200; });
+      }
+      if(e.heal>=HEAL_MS){ e.cut=false; e.heal=0; changed=true; }
+    });
+    if(changed){
+      const {retaken}=recompute();
+      if(retaken.length){ sndRetake(); toast("The Crown re-garrisons — "+retaken.join(", ")+" retaken!"); }
+    }
+    // engine: powder regen scales with secured states
+    powder=Math.min(POWDER_CAP, powder + (REGEN_BASE + REGEN_PER_SECURED*securedCount)*(dt/1000));
+    timeLeft-=dt; pulse+=dt/1000;
+    if(securedCount>=13 && !won) endGame(true);
+    else if(timeLeft<=0 && !lost) endGame(false);
+    syncHUD();
+  }
+  let logicTimer=null;
+  function startLogic(){ lastTs=performance.now(); logicTimer=setInterval(()=>tick(performance.now()),80); }
+
+  // ---------- Render ----------
+  function draw(){
+    requestAnimationFrame(draw);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle="#070b18"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle="rgba(232,195,74,.10)";
+    for(let i=0;i<46;i++){ const x=(i*97+13)%W, y=(i*53+29)%H; ctx.fillRect(x,y,2,2); }
+    ctx.strokeStyle="rgba(79,155,232,.10)"; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(478,28); ctx.lineTo(438,592); ctx.stroke();
+
+    // edges
+    for(const e of edges){
+      const a=nodes[e.a], b=nodes[e.b];
+      if(e.cut){
+        const held=heldBySecured(e);
+        if(held){
+          // permanently severed — held by a secured colony
+          ctx.strokeStyle="rgba(232,195,74,.16)"; ctx.lineWidth=1.5; ctx.setLineDash([3,7]);
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+        } else {
+          // re-garrisoning — line refills from the Crown side; reddens as it nears
+          const f=Math.max(0,Math.min(1,e.heal/HEAL_MS));
+          ctx.strokeStyle="rgba(120,130,160,.18)"; ctx.lineWidth=1.5; ctx.setLineDash([4,6]);
+          ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.setLineDash([]);
+          // crown-side endpoint first
+          const ca = (e.a==="CROWN")?a:b, cb=(e.a==="CROWN")?b:a;
+          const k=0.4+0.6*Math.sin(pulse*8);
+          ctx.strokeStyle = f>0.6 ? "rgba(193,39,45,"+(0.4+0.5*k)+")" : "rgba(193,39,45,.45)";
+          ctx.lineWidth=3;
+          ctx.beginPath(); ctx.moveTo(ca.x,ca.y); ctx.lineTo(ca.x+(cb.x-ca.x)*f, ca.y+(cb.y-ca.y)*f); ctx.stroke();
+        }
+        continue;
+      }
+      const hot=(e.key===hoverKey);
+      ctx.strokeStyle = hot?"#ff5a60":"rgba(193,39,45,.78)";
+      ctx.lineWidth = hot?4.5:2.5;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+      if(hot){
+        ctx.fillStyle="#ffd0c0"; ctx.font="11px 'Courier New',monospace"; ctx.textAlign="center";
+        ctx.fillText("✂ cut (-1)", (a.x+b.x)/2, (a.y+b.y)/2-7);
+      }
+    }
+
+    drawCrown(nodes.CROWN.x, nodes.CROWN.y);
+
+    const tNow=performance.now();
+    for(const c of COLONIES){
+      const n=nodes[c.id];
+      const risk=(flashUntil[c.id]||0)>tNow;
+      const fill = n.secured?"#1d2a52":(n.free?"#163255":"#3a1216");
+      const ring = n.secured?"#e8c34a":(n.free?"#4f9be8":"#c1272d");
+      const r=15;
+      if(risk){ const k=0.5+0.5*Math.sin(pulse*12);
+        ctx.fillStyle="rgba(255,80,80,"+(0.10+0.20*k)+")";
+        ctx.beginPath(); ctx.arc(n.x,n.y,r+8,0,7); ctx.fill(); }
+      if(n.secured){ ctx.fillStyle="rgba(232,195,74,.15)";
+        ctx.beginPath(); ctx.arc(n.x,n.y,r+6,0,7); ctx.fill(); }
+      ctx.fillStyle=fill; ctx.beginPath(); ctx.arc(n.x,n.y,r,0,7); ctx.fill();
+      ctx.lineWidth=3; ctx.strokeStyle=ring; ctx.beginPath(); ctx.arc(n.x,n.y,r,0,7); ctx.stroke();
+      if(n.free){ ctx.fillStyle=n.secured?"#e8c34a":"#bfe0ff"; star(n.x,n.y,n.secured?6.5:5.5,5); }
+      ctx.fillStyle="#dfe3f0"; ctx.font="bold 11px 'Courier New',monospace"; ctx.textAlign="center";
+      ctx.fillText(c.id, n.x, n.y-r-5);
+    }
+  }
+  function star(cx,cy,rad,points){
+    ctx.beginPath();
+    for(let i=0;i<points*2;i++){
+      const ang=(Math.PI/points)*i - Math.PI/2;
+      const rr=(i%2===0)?rad:rad*0.45;
+      const x=cx+Math.cos(ang)*rr, y=cy+Math.sin(ang)*rr;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  function drawCrown(x,y){
+    const k=0.5+0.5*Math.sin(pulse*2);
+    ctx.fillStyle="rgba(232,195,74,"+(0.10+0.10*k)+")";
+    ctx.beginPath(); ctx.arc(x,y,34,0,7); ctx.fill();
+    ctx.fillStyle="#1a1408"; ctx.beginPath(); ctx.arc(x,y,24,0,7); ctx.fill();
+    ctx.lineWidth=3; ctx.strokeStyle="#e8c34a"; ctx.beginPath(); ctx.arc(x,y,24,0,7); ctx.stroke();
+    ctx.fillStyle="#e8c34a"; ctx.beginPath();
+    ctx.moveTo(x-13,y+8); ctx.lineTo(x-15,y-9); ctx.lineTo(x-6,y-1);
+    ctx.lineTo(x,y-12); ctx.lineTo(x+6,y-1); ctx.lineTo(x+15,y-9);
+    ctx.lineTo(x+13,y+8); ctx.closePath(); ctx.fill();
+    ctx.fillStyle="#dfe3f0"; ctx.font="bold 10px 'Courier New',monospace"; ctx.textAlign="center";
+    ctx.fillText("CROWN", x, y+22);
+  }
+
+  // ---------- Lifecycle ----------
+  function startGame(){
+    buildGraph(); recompute();
+    powder=START_POWDER; timeLeft=GAME_MS; running=true; won=false; lost=false; flashUntil={};
+    document.getElementById("startOv").classList.add("hidden");
+    document.getElementById("endOv").classList.add("hidden");
+    if(actx && actx.state==="suspended") actx.resume();
+    syncHUD();
+    if(!logicTimer) startLogic();
+  }
+  function endGame(win){
+    if(win) won=true; else lost=true; running=false;
+    const ov=document.getElementById("endOv");
+    const title=document.getElementById("endTitle"), msg=document.getElementById("endMsg");
+    if(win){
+      const used=Math.ceil((GAME_MS-timeLeft)/1000);
+      title.textContent="★ INDEPENDENCE DAY ★"; title.className="win";
+      msg.innerHTML="All thirteen colonies are independent and secured. The Crown holds nothing.<br>You broke every dependency in <b>"+Math.floor(used/60)+":"+String(used%60).padStart(2,"0")+"</b>. 🎆";
+      sndWin();
+    }else{
+      title.textContent="THE REVOLUTION STALLS"; title.className="";
+      msg.innerHTML="Time ran out — only <b>"+securedCount+"/13</b> colonies secured.<br>Cut a whole region's lines in one go and lock it in (2+ free neighbors) before the Crown re-garrisons.";
+      sndLose();
+    }
+    ov.classList.remove("hidden");
+  }
+
+  document.getElementById("startBtn").addEventListener("click",startGame);
+  document.getElementById("againBtn").addEventListener("click",startGame);
+  document.getElementById("howBtn").addEventListener("click",()=>{
+    if(running) toast("Sever every link from a colony to the Crown to free it; lock clusters (2+ free neighbors) before lines heal.");
+    else document.getElementById("startOv").classList.remove("hidden");
+  });
+  document.getElementById("muteBtn").addEventListener("click",(e)=>{
+    muted=!muted; e.target.textContent=muted?"🔇 Sound: Off":"🔊 Sound: On";
+  });
+
+  // boot
+  buildGraph(); recompute(); syncHUD(); draw();
+
+  // headless verification hook
+  window.__DD={ nodes, edges, recompute, reachableFromCrown, heldBySecured, COLONIES, EDGE_DEFS,
+    state:()=>({powder,freeCount,securedCount,timeLeft,running,won,lost}),
+    cut:(key)=>{const e=edges.find(x=>x.key===key); if(e&&!e.cut){e.cut=true;e.heal=0; return recompute();} return null;},
+    setRunning:(v)=>{running=v;}, addPowder:(n)=>{powder+=n;} };
+})();
+</script>
+</body>
+</html>
