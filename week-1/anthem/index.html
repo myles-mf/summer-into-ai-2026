@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LIBERTY CHIPTUNE — 8-Bit Anthem Maker</title>
+<meta name="description" content="An 8-bit chiptune step-sequencer with patriotic presets and shareable tunes — Summer Into AI, Theme 1: 8-Bit America." />
+<style>
+  :root { --red:#c1272d; --white:#f4f1e8; --blue:#3f63c8; --navy:#1a2a55; --gold:#e8c34a; --ink:#07080f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; background:var(--ink); color:var(--white); font-family:"Courier New",monospace; overflow-x:hidden; }
+  body { display:flex; flex-direction:column; align-items:center; gap:12px; padding:14px; min-height:100%; }
+  h1 { font-size:clamp(17px,3.6vw,30px); letter-spacing:3px; text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue); text-align:center; margin-top:6px; }
+  h1 .star { color:var(--gold); }
+  .sub { font-size:11px; opacity:.65; letter-spacing:1px; text-align:center; }
+  .stage { position:relative; border:4px solid var(--gold); box-shadow:0 0 0 4px var(--ink),0 0 28px rgba(232,195,74,.3); background:#04050a; line-height:0; }
+  canvas { display:block; image-rendering:pixelated; cursor:pointer; }
+  .stage::after { content:""; position:absolute; inset:0; pointer-events:none;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px),
+                radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,.45) 100%); mix-blend-mode:multiply; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center; font-size:12px; letter-spacing:1px; }
+  button, select { font-family:inherit; font-size:12px; letter-spacing:1px; color:var(--ink); background:var(--gold);
+    border:none; border-bottom:3px solid #a9842a; padding:8px 12px; cursor:pointer; text-transform:uppercase; }
+  button:hover, select:hover { filter:brightness(1.1); }
+  button:active { transform:translateY(2px); border-bottom-width:1px; }
+  button.alt, select { background:var(--navy); color:var(--white); border-bottom-color:#0c1430; }
+  button.red { background:var(--red); color:#fff; border-bottom-color:#7a161b; }
+  button.on { background:var(--gold); color:var(--ink); border-bottom-color:#a9842a; }
+  label { display:flex; align-items:center; gap:6px; opacity:.85; }
+  input[type=range] { accent-color:var(--gold); }
+  .hint { font-size:11px; opacity:.55; text-align:center; max-width:680px; line-height:1.5; }
+  #toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--gold); color:var(--ink);
+    padding:8px 16px; font-size:12px; letter-spacing:1px; opacity:0; transition:opacity .2s; pointer-events:none; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+  <h1><span class="star">★</span> LIBERTY CHIPTUNE <span class="star">★</span></h1>
+  <div class="sub">8-bit anthem maker &middot; paint a tune, hear it sing &middot; 8-BIT AMERICA</div>
+
+  <div class="stage"><canvas id="seq" width="640" height="312"></canvas></div>
+
+  <div class="row">
+    <button id="play" class="red">▶ Play</button>
+    <select id="preset">
+      <option value="">— Preset —</option>
+      <option value="yankee">Yankee Doodle</option>
+      <option value="glory">Battle Hymn (riff)</option>
+      <option value="fanfare">Liberty Fanfare</option>
+      <option value="clear">Clear grid</option>
+    </select>
+    <select id="wave">
+      <option value="square">Square</option>
+      <option value="triangle">Triangle</option>
+      <option value="sawtooth">Saw</option>
+    </select>
+    <button id="drums" class="on">Drums: On</button>
+  </div>
+  <div class="row">
+    <label>Tempo <input id="tempo" type="range" min="80" max="220" value="132" /> <b id="bpm">132</b></label>
+    <button id="share" class="alt">⛓ Copy share link</button>
+    <button id="random" class="alt">🎲 Randomize</button>
+  </div>
+
+  <div class="hint">
+    Click cells to place notes (low&nbsp;→&nbsp;high, left&nbsp;→&nbsp;right in time). Press <b>Play</b> to hear your 8-bit anthem,
+    load a <b>preset</b>, then <b>Copy share link</b> to send your tune to anyone. Built for Summer Into AI — Theme&nbsp;1: 8-Bit America.
+  </div>
+
+  <div id="toast">Link copied!</div>
+
+<script>
+(() => {
+  "use strict";
+  const canvas = document.getElementById("seq");
+  const ctx = canvas.getContext("2d");
+  const STEPS = 16;
+  const NOTES = [ // low -> high, C major across ~1.5 octaves
+    {n:"C4",f:261.63},{n:"D4",f:293.66},{n:"E4",f:329.63},{n:"F4",f:349.23},
+    {n:"G4",f:392.00},{n:"A4",f:440.00},{n:"B4",f:493.88},{n:"C5",f:523.25},
+    {n:"D5",f:587.33},{n:"E5",f:659.25},{n:"F5",f:698.46},{n:"G5",f:783.99},{n:"A5",f:880.00},
+  ];
+  const ROWS = NOTES.length;
+  const padL = 34, padT = 8;
+  const cw = (canvas.width - padL) / STEPS;
+  const chh = (canvas.height - padT * 2) / ROWS;
+
+  // grid[step] = Set of rowIndex (rowIndex 0 = lowest note)
+  let grid = Array.from({ length: STEPS }, () => new Set());
+  let playStep = -1, playing = false, bpm = 132, wave = "square", drumsOn = true;
+
+  // ---- presets (step -> rowIndex), best-effort recognizable phrases --------
+  const PRESETS = {
+    clear: [],
+    yankee: [[0,0],[2,0],[4,1],[6,2],[8,0],[10,2],[12,1],[14,4]],              // "Yankee Doodle went to town..."
+    glory:  [[0,4],[2,4],[3,4],[4,2],[6,4],[8,7],[10,6],[12,4],[14,2]],         // Battle Hymn opening shape
+    fanfare:[[0,0],[2,2],[4,4],[6,7],[7,7],[8,11],[10,7],[12,4],[14,7],[15,7]], // triumphant arpeggio
+  };
+  function loadPattern(pairs) {
+    grid = Array.from({ length: STEPS }, () => new Set());
+    for (const [s, r] of pairs) if (s < STEPS && r < ROWS) grid[s].add(r);
+  }
+
+  // ---- rendering -----------------------------------------------------------
+  function draw() {
+    ctx.fillStyle = "#04050a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let r = 0; r < ROWS; r++) {
+      const y = padT + (ROWS - 1 - r) * chh;
+      // note label
+      ctx.fillStyle = (NOTES[r].n[0] === "C") ? "#e8c34a" : "#5a6488";
+      ctx.font = "9px Courier New"; ctx.textBaseline = "middle";
+      ctx.fillText(NOTES[r].n, 2, y + chh / 2);
+      for (let s = 0; s < STEPS; s++) {
+        const x = padL + s * cw;
+        const beat = (s % 4 === 0);
+        if (s === playStep) ctx.fillStyle = "#23304f";
+        else ctx.fillStyle = beat ? "#11162e" : "#0b0f22";
+        ctx.fillRect(x + 1, y + 1, cw - 2, chh - 2);
+        if (grid[s].has(r)) {
+          const lit = (s === playStep);
+          ctx.fillStyle = lit ? "#f4f1e8" : (r % 7 === 0 ? "#e8c34a" : (r > 6 ? "#c1272d" : "#3f63c8"));
+          ctx.fillRect(x + 2, y + 2, cw - 4, chh - 4);
+        }
+      }
+    }
+  }
+
+  // ---- audio (WebAudio chiptune) ------------------------------------------
+  let actx = null, master = null;
+  function ensureAudio() {
+    if (!actx) {
+      try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { return; }
+      master = actx.createGain(); master.gain.value = 0.22; master.connect(actx.destination);
+    }
+    if (actx.state === "suspended") actx.resume();
+  }
+  function blip(freq, t, dur, type) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(master); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noiseHit(t, dur, lp, gain) {
+    const n = Math.floor(actx.sampleRate * dur);
+    const buf = actx.createBuffer(1, n, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = actx.createBufferSource(); src.buffer = buf;
+    const f = actx.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp;
+    const g = actx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + dur);
+  }
+  function scheduleStep(step, t) {
+    const dur = (60 / bpm) / 2; // eighth-ish note length
+    grid[step].forEach(r => blip(NOTES[r].f, t, dur, wave));
+    // bassline: root of any note an octave down on beats
+    if (step % 4 === 0 && grid[step].size) {
+      const lowest = Math.min(...grid[step]);
+      blip(NOTES[lowest].f / 2, t, dur, "triangle");
+    }
+    if (drumsOn) {
+      if (step % 4 === 0) noiseHit(t, 0.12, 200, 0.8);       // kick-ish
+      if (step % 8 === 4) noiseHit(t, 0.10, 1800, 0.5);      // snare-ish
+      if (step % 2 === 1) noiseHit(t, 0.03, 6000, 0.12);     // hat
+    }
+  }
+
+  // ---- scheduler (lookahead) ----------------------------------------------
+  let nextTime = 0, schedStep = 0, timer = null;
+  function stepDur() { return (60 / bpm) / 4; } // 16th notes
+  function scheduler() {
+    while (nextTime < actx.currentTime + 0.12) {
+      scheduleStep(schedStep, nextTime);
+      const thisStep = schedStep;
+      const at = nextTime;
+      // sync the visual cursor to audio time
+      const delay = (at - actx.currentTime) * 1000;
+      setTimeout(() => { playStep = thisStep; }, Math.max(0, delay));
+      nextTime += stepDur();
+      schedStep = (schedStep + 1) % STEPS;
+    }
+  }
+  function play() {
+    ensureAudio(); if (!actx) return;
+    playing = true; schedStep = 0; nextTime = actx.currentTime + 0.05;
+    timer = setInterval(scheduler, 25);
+    document.getElementById("play").textContent = "■ Stop";
+    document.getElementById("play").classList.add("on");
+  }
+  function stop() {
+    playing = false; clearInterval(timer); timer = null; playStep = -1;
+    document.getElementById("play").textContent = "▶ Play";
+    document.getElementById("play").classList.remove("on");
+  }
+
+  // ---- input ---------------------------------------------------------------
+  function cellAt(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width * canvas.width;
+    const y = (clientY - rect.top) / rect.height * canvas.height;
+    if (x < padL) return null;
+    const s = Math.floor((x - padL) / cw);
+    const visRow = Math.floor((y - padT) / chh);
+    const r = ROWS - 1 - visRow;
+    if (s < 0 || s >= STEPS || r < 0 || r >= ROWS) return null;
+    return { s, r };
+  }
+  function toggle(clientX, clientY) {
+    const c = cellAt(clientX, clientY); if (!c) return;
+    if (grid[c.s].has(c.r)) grid[c.s].delete(c.r); else grid[c.s].add(c.r);
+    ensureAudio(); if (actx) blip(NOTES[c.r].f, actx.currentTime, 0.18, wave);
+    saveHash();
+  }
+  canvas.addEventListener("click", e => toggle(e.clientX, e.clientY));
+  canvas.addEventListener("touchstart", e => { e.preventDefault(); const t = e.changedTouches[0]; toggle(t.clientX, t.clientY); }, { passive: false });
+
+  // ---- controls ------------------------------------------------------------
+  document.getElementById("play").addEventListener("click", () => playing ? stop() : play());
+  document.getElementById("tempo").addEventListener("input", e => { bpm = +e.target.value; document.getElementById("bpm").textContent = bpm; saveHash(); });
+  document.getElementById("wave").addEventListener("change", e => { wave = e.target.value; saveHash(); });
+  document.getElementById("drums").addEventListener("click", e => { drumsOn = !drumsOn; e.target.textContent = "Drums: " + (drumsOn ? "On" : "Off"); e.target.classList.toggle("on", drumsOn); saveHash(); });
+  document.getElementById("preset").addEventListener("change", e => {
+    const p = e.target.value; if (p && PRESETS[p]) { loadPattern(PRESETS[p]); saveHash(); }
+    e.target.value = "";
+  });
+  document.getElementById("random").addEventListener("click", () => {
+    grid = Array.from({ length: STEPS }, () => new Set());
+    for (let s = 0; s < STEPS; s++) if (Math.random() < 0.55) grid[s].add(Math.floor(Math.random() * ROWS));
+    saveHash();
+  });
+  document.getElementById("share").addEventListener("click", () => {
+    saveHash();
+    const url = location.href;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(showToast).catch(() => {
+      // fallback: select prompt
+      window.prompt("Copy your tune link:", url);
+    });
+  });
+  function showToast() { const t = document.getElementById("toast"); t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1400); }
+
+  // ---- share state in URL hash --------------------------------------------
+  // pack: bits for STEPS*ROWS grid -> base64url, plus bpm/wave/drums
+  function saveHash() {
+    const bytes = new Uint8Array(Math.ceil(STEPS * ROWS / 8));
+    let bit = 0;
+    for (let s = 0; s < STEPS; s++) for (let r = 0; r < ROWS; r++) {
+      if (grid[s].has(r)) bytes[bit >> 3] |= (1 << (bit & 7));
+      bit++;
+    }
+    let bin = ""; bytes.forEach(b => bin += String.fromCharCode(b));
+    const g = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const w = { square: 0, triangle: 1, sawtooth: 2 }[wave];
+    history.replaceState(null, "", "#" + g + "." + bpm + "." + w + "." + (drumsOn ? 1 : 0));
+  }
+  function loadHash() {
+    const h = location.hash.slice(1); if (!h) return false;
+    try {
+      const [g, b, w, d] = h.split(".");
+      const bin = atob(g.replace(/-/g, "+").replace(/_/g, "/"));
+      const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      grid = Array.from({ length: STEPS }, () => new Set());
+      let bit = 0;
+      for (let s = 0; s < STEPS; s++) for (let r = 0; r < ROWS; r++) {
+        if (bytes[bit >> 3] & (1 << (bit & 7))) grid[s].add(r);
+        bit++;
+      }
+      if (b) { bpm = Math.min(220, Math.max(80, +b)); document.getElementById("tempo").value = bpm; document.getElementById("bpm").textContent = bpm; }
+      if (w !== undefined) { wave = ["square","triangle","sawtooth"][+w] || "square"; document.getElementById("wave").value = wave; }
+      if (d !== undefined) { drumsOn = d === "1"; document.getElementById("drums").textContent = "Drums: " + (drumsOn ? "On" : "Off"); document.getElementById("drums").classList.toggle("on", drumsOn); }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---- boot ----------------------------------------------------------------
+  if (!loadHash()) loadPattern(PRESETS.yankee);
+  (function render() { draw(); requestAnimationFrame(render); })();
+})();
+</script>
+</body>
+</html>
