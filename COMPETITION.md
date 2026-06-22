@@ -80,7 +80,7 @@ Write a public post and **tag @advisoryhour**, including:
 
 | Week | Dates | Theme | Our build | Status |
 |---|---|---|---|---|
-| 1 | Mon Jun 15 → Sun Jun 21, 2026 | **8-Bit America** | **2 entries — both Published ✅** · (a) **Game of Liberty** — 8-bit territory battle (`week-1/`); (b) **Liberty Chiptune** — 8-bit anthem maker (`week-1/anthem/`) | Posts live on merlinforge.substack.com; both tag @advisoryhour + reference competitors |
+| 1 | Mon Jun 15 → Sun Jun 21, 2026 | **8-Bit America** | **3 entries — all Published ✅** · (a) **Game of Liberty** — territory-battle game (`week-1/`); (b) **Liberty Chiptune** — 8-bit anthem maker (`week-1/anthem/`); (c) **Founding Father A.I.** — real-LLM chat (`week-1/founding-father/`, deployed on Vercel) | All on merlinforge.substack.com; all tag @advisoryhour. Competitor refs across posts: Adam's Paul Revere, Megaman 1776, Timestorm Baseball, British Kraken |
 | 2 | Jun 22 → Jun 28 | *(drops Mon Jun 22)* | — | ⚡ **Be first to submit** = first-submission bonus (we missed it in W1). Watch for the theme drop. |
 
 ## 7. Competitor watch (seen so far)
