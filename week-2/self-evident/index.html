@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SELF-EVIDENT — a language model with no ancestors</title>
+<style>
+  :root{
+    --red:#c1272d; --white:#f4f1e8; --blue:#3b56b0; --sky:#7da2ff;
+    --gold:#e8c34a; --ink:#06070d; --panel:#0b0f22; --line:#1c2547;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{min-height:100%;}
+  body{background:var(--ink);color:var(--white);font-family:"Courier New",monospace;
+    -webkit-tap-highlight-color:transparent;line-height:1.5;}
+  .wrap{max-width:920px;margin:0 auto;padding:16px 14px 48px;}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+  h1{font-size:clamp(20px,5vw,32px);letter-spacing:3px;color:var(--gold);
+     text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue);}
+  .tagline{font-size:12px;color:var(--sky);letter-spacing:1px;}
+  .sub{font-size:12px;color:#9fb0e0;margin:8px 0 16px;max-width:680px;}
+  .sub b{color:var(--white);}
+
+  .deck{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    border:2px solid var(--line);background:#080b1a;padding:12px;margin-bottom:14px;}
+  button{font-family:inherit;font-size:13px;letter-spacing:1px;color:var(--white);
+    background:var(--panel);border:2px solid var(--gold);padding:10px 14px;cursor:pointer;
+    transition:transform .07s,background .15s;white-space:nowrap;}
+  button:hover{background:#11183a;transform:translateY(-2px);} button:active{transform:translateY(0);}
+  button.play{border-color:var(--sky);min-width:150px;font-weight:bold;}
+  button.play.on{background:var(--red);border-color:var(--red);color:#ffe7e1;}
+  button.ghost{border-color:var(--line);color:#9fb0e0;font-size:12px;padding:9px 11px;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field .l{font-size:9px;letter-spacing:1px;color:#7c8bbf;}
+  input[type=range]{width:120px;}
+  .spacer{flex:1;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
+  .stat{border:1px solid var(--line);background:#080b1a;padding:9px 11px;}
+  .stat .k{font-size:9px;letter-spacing:1px;color:#7c8bbf;}
+  .stat .v{font-size:18px;color:var(--gold);margin-top:2px;}
+  .stat .v small{font-size:11px;color:#9fb0e0;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:720px){ .grid{grid-template-columns:1fr;} }
+  .card{border:2px solid var(--line);background:#080b1a;padding:12px;}
+  .card h3{font-size:11px;letter-spacing:2px;color:var(--sky);margin-bottom:8px;
+    display:flex;align-items:center;gap:8px;}
+  .card h3 .tag{margin-left:auto;font-size:9px;color:#7c8bbf;letter-spacing:1px;}
+  canvas.loss{width:100%;height:150px;display:block;background:#05070f;border:1px solid var(--line);}
+  canvas.attn{width:100%;height:200px;display:block;background:#05070f;border:1px solid var(--line);
+    image-rendering:pixelated;}
+  .gen{font-size:13px;line-height:1.7;white-space:pre-wrap;word-break:break-word;
+    min-height:150px;color:#e8ecf7;}
+  .gen.frozen{color:#6b779e;}
+  .gen .new{color:var(--gold);}
+  .twin{font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;
+    min-height:64px;color:#6b779e;}
+  .lab{font-size:10px;color:#7c8bbf;letter-spacing:1px;margin:10px 0 4px;}
+  .promptrow{display:flex;gap:8px;margin-top:10px;}
+  .promptrow input{flex:1;font-family:inherit;font-size:12px;color:var(--white);
+    background:#070a16;border:1px solid var(--line);padding:8px;}
+  .note{font-size:11px;color:#7c8bbf;line-height:1.6;margin-top:18px;}
+  .note b{color:var(--gold);} .note a{color:var(--sky);}
+
+  #intro{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:#06070dee;backdrop-filter:blur(2px);overflow:auto;}
+  #intro .ic{max-width:580px;border:3px solid var(--gold);background:var(--panel);padding:24px;
+    box-shadow:0 0 0 4px #06070d,0 12px 40px #000;}
+  #intro h1{margin-bottom:6px;}
+  #intro .tag{font-size:12px;color:var(--sky);letter-spacing:1px;margin-bottom:16px;}
+  #intro p{font-size:13px;line-height:1.65;color:#d7dcef;margin-bottom:12px;}
+  #intro p b{color:var(--white);} #intro .g{color:var(--gold);}
+  #intro .start{margin-top:8px;width:100%;font-size:14px;padding:13px;border-color:var(--sky);}
+  .iBtn{position:fixed;right:12px;top:12px;z-index:6;width:30px;height:30px;padding:0;border-radius:50%;
+    border:2px solid var(--line);color:#9fb0e0;background:var(--panel);font-size:13px;}
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>★ SELF-EVIDENT</h1>
+    <span class="tagline">a language model with no ancestors</span>
+  </header>
+  <div class="sub">
+    A real GPT &mdash; <b>hand-written from scratch, no libraries</b> (attention, backprop, the optimizer, every line).
+    It starts as <b>pure noise</b> with no pretrained weights, no provider, no cloud, and teaches itself the voice of the
+    American founding <b>live, while you watch</b> &mdash; learning from nothing but the founding documents.
+    Independence as <b>self-origination</b>: an intelligence that owes its mind to no one.
+  </div>
+
+  <div class="deck">
+    <button class="play" id="play">▶ DECLARE INDEPENDENCE</button>
+    <button class="ghost" id="reset">⟳ RESET TO NOISE</button>
+    <div class="field"><span class="l">SPEED (steps/frame) <b id="spv">2</b></span>
+      <input type="range" id="speed" min="1" max="6" value="2" /></div>
+    <div class="field"><span class="l">TEMPERATURE <b id="tpv">0.8</b></span>
+      <input type="range" id="temp" min="20" max="130" value="80" /></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">PARAMETERS</div><div class="v" id="s-params">—</div></div>
+    <div class="stat"><div class="k">STEP</div><div class="v" id="s-step">0</div></div>
+    <div class="stat"><div class="k">TRAIN LOSS</div><div class="v" id="s-loss">—</div></div>
+    <div class="stat"><div class="k">HELD-OUT LOSS</div><div class="v" id="s-val">—</div></div>
+    <div class="stat"><div class="k">TOKENS/SEC</div><div class="v" id="s-tps">—</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>LEARNING CURVE <span class="tag" id="curveTag">cross-entropy, lower = better</span></h3>
+      <canvas class="loss" id="loss"></canvas>
+      <div class="lab">▦ ATTENTION — what one head learns to look at (last sequence)</div>
+      <canvas class="attn" id="attn"></canvas>
+    </div>
+    <div class="card">
+      <h3>IT WRITES, LIVE <span class="tag" id="genTag">untrained</span></h3>
+      <div class="gen" id="gen">…</div>
+      <div class="lab">FROZEN TWIN — an identical net that never learns (pure noise, for contrast)</div>
+      <div class="twin" id="twin">…</div>
+      <div class="promptrow">
+        <input id="prompt" spellcheck="false" value="We hold these truths" />
+        <button class="ghost" id="regen">WRITE ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>How it's built:</b> a char-level <b>transformer</b> (token + positional embeddings → 2 blocks of causal
+    multi-head self-attention + MLP, LayerNorm, residuals → LM head), with the <b>forward pass, full backpropagation,
+    and an AdamW optimizer all written by hand</b> in one file — no TensorFlow, no autograd library, no API. The
+    backprop is verified by a numerical gradient check (open the console: <code>__gpt.gradCheck()</code>). It trains
+    on the Declaration of Independence, the Constitution's preamble, and the Federalist Papers — so it learns a
+    <i>style</i>, not facts; a tiny model writing in 1776's cadence. The frozen twin proves the point: same architecture,
+    never trained, never coherent.
+    <br><br>Week 2 · Independence Engines · a companion to
+    <a href="../murmuration/">Murmuration</a>, <a href="../liberty-engine/">Liberty Engine</a>, and
+    <a href="../solo/">SOLO</a>.
+  </div>
+</div>
+
+<button class="iBtn" id="reopen" title="How it works">ⓘ</button>
+<div id="intro">
+  <div class="ic">
+    <h1>★ SELF-EVIDENT</h1>
+    <div class="tag">WEEK 2 · INDEPENDENCE ENGINES · independence is not a symbol, it's a <i>mechanic</i></div>
+    <p>Most "AI builds" call someone else's model. This one <b>is</b> the model — a <span class="g">GPT written from scratch</span>, every line of the attention and the training math by hand, running in this tab with no server and no pretrained weights.</p>
+    <p>It begins as <b>noise</b>. Press the button and it starts teaching itself to write — from <i>nothing</i> but the founding documents. Watch the loss fall and the gibberish resolve into the cadence of 1776, live.</p>
+    <p style="color:#9fb0e0;font-size:12px;">Independence as <b>self-origination</b>: an intelligence with no ancestors, beholden to no provider. It declares independence from every model that came before it.</p>
+    <button class="start" id="go">▶ BEGIN FROM NOTHING</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===========================================================================
+   SELF-EVIDENT — a char-level GPT with hand-written forward + backprop + AdamW.
+   No libraries. Math in flat Float32Arrays. Verified by numerical grad check.
+   Headless harness: window.__gpt (preview tab pauses rAF; verify there).
+   =========================================================================== */
+
+/* ---------- the founding corpus (public domain) ---------- */
+const CORPUS =
+`When in the Course of human events, it becomes necessary for one people to dissolve the political bands which have connected them with another, and to assume among the powers of the earth, the separate and equal station to which the Laws of Nature and of Nature's God entitle them, a decent respect to the opinions of mankind requires that they should declare the causes which impel them to the separation.
+
+We hold these truths to be self-evident, that all men are created equal, that they are endowed by their Creator with certain unalienable Rights, that among these are Life, Liberty and the pursuit of Happiness. That to secure these rights, Governments are instituted among Men, deriving their just powers from the consent of the governed, That whenever any Form of Government becomes destructive of these ends, it is the Right of the People to alter or to abolish it, and to institute new Government, laying its foundation on such principles and organizing its powers in such form, as to them shall seem most likely to effect their Safety and Happiness.
+
+Prudence, indeed, will dictate that Governments long established should not be changed for light and transient causes; and accordingly all experience hath shewn, that mankind are more disposed to suffer, while evils are sufferable, than to right themselves by abolishing the forms to which they are accustomed. But when a long train of abuses and usurpations, pursuing invariably the same Object evinces a design to reduce them under absolute Despotism, it is their right, it is their duty, to throw off such Government, and to provide new Guards for their future security.
+
+We, therefore, the Representatives of the United States of America, do, in the Name, and by Authority of the good People of these Colonies, solemnly publish and declare, That these United Colonies are, and of Right ought to be Free and Independent States; and that as Free and Independent States, they have full Power to levy War, conclude Peace, contract Alliances, establish Commerce, and to do all other Acts and Things which Independent States may of right do. And for the support of this Declaration, with a firm reliance on the protection of divine Providence, we mutually pledge to each other our Lives, our Fortunes and our sacred Honor.
+
+We the People of the United States, in Order to form a more perfect Union, establish Justice, insure domestic Tranquility, provide for the common defence, promote the general Welfare, and secure the Blessings of Liberty to ourselves and our Posterity, do ordain and establish this Constitution for the United States of America.
+
+It has been frequently remarked that it seems to have been reserved to the people of this country, by their conduct and example, to decide the important question, whether societies of men are really capable or not of establishing good government from reflection and choice, or whether they are forever destined to depend for their political constitutions on accident and force. If there be any truth in the remark, the crisis at which we are arrived may with propriety be regarded as the era in which that decision is to be made; and a wrong election of the part we shall act may, in this view, deserve to be considered as the general misfortune of mankind.`;
+
+/* ---------- tokenizer (char level) ---------- */
+const chars = Array.from(new Set(CORPUS.split(''))).sort();
+const stoi = {}; chars.forEach((c,i)=>stoi[c]=i);
+const itos = chars;
+const VOCAB = chars.length;
+const encode = s => Array.from(s).map(c => stoi[c] ?? 0);
+const decode = a => a.map(i => itos[i] ?? '').join('');
+const dataAll = encode(CORPUS);
+const nTrain = Math.floor(dataAll.length*0.9);
+const dataTrain = dataAll.slice(0,nTrain), dataVal = dataAll.slice(nTrain);
+
+/* ---------- rng (seedable for the frozen twin / reproducibility) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let RNG = mulberry32(1776);
+function randn(){ // Box-Muller
+  let u=0,v=0; while(u===0)u=RNG(); while(v===0)v=RNG();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+
+/* ---------- low-level matmul helpers (flat Float32Array) ---------- */
+function mm(A,B,M,K,N){ // C[M*N] = A[M*K] · B[K*N]
+  const C=new Float32Array(M*N);
+  for(let i=0;i<M;i++){ const iA=i*K,iC=i*N;
+    for(let k=0;k<K;k++){ const a=A[iA+k]; if(a===0)continue; const iB=k*N;
+      for(let j=0;j<N;j++) C[iC+j]+=a*B[iB+j]; } }
+  return C;
+}
+function mmBt(dC,B,M,K,N){ // dA[M*K] = dC[M*N] · B[K*N]^T   (B is K×N)
+  const dA=new Float32Array(M*K);
+  for(let i=0;i<M;i++){ const iC=i*N;
+    for(let k=0;k<K;k++){ let s=0; const iB=k*N;
+      for(let j=0;j<N;j++) s+=dC[iC+j]*B[iB+j]; dA[i*K+k]=s; } }
+  return dA;
+}
+function mmAt(A,dC,M,K,N){ // dB[K*N] = A[M*K]^T · dC[M*N]
+  const dB=new Float32Array(K*N);
+  for(let i=0;i<M;i++){ const iA=i*K,iC=i*N;
+    for(let k=0;k<K;k++){ const a=A[iA+k]; if(a===0)continue; const iB=k*N;
+      for(let j=0;j<N;j++) dB[iB+j]+=a*dC[iC+j]; } }
+  return dB;
+}
+
+/* ---------- parameter container with Adam state ---------- */
+function P(rows,cols,scale){ // returns {w,g,m,v,rows,cols}
+  const n=rows*cols, w=new Float32Array(n), g=new Float32Array(n),
+        m=new Float32Array(n), v=new Float32Array(n);
+  if(scale>0) for(let i=0;i<n;i++) w[i]=randn()*scale;
+  return {w,g,m,v,rows,cols};
+}
+
+/* ---------- the model ---------- */
+function makeModel(cfg){
+  const D=cfg.dModel, H=cfg.nHead, L=cfg.nLayer, T=cfg.block, V=VOCAB, hd=D/H;
+  const m={cfg:Object.assign({},cfg,{vocab:V}), D,H,L,T,V,hd, params:[], blocks:[]};
+  const reg=p=>{m.params.push(p);return p;};
+  m.tok=reg(P(V,D,0.02));
+  m.pos=reg(P(T,D,0.02));
+  for(let l=0;l<L;l++){
+    const b={
+      ln1g:reg(P(1,D,0)), ln1b:reg(P(1,D,0)),
+      qkv:reg(P(D,3*D,0.02)), qkvb:reg(P(1,3*D,0)),
+      proj:reg(P(D,D,0.02)), projb:reg(P(1,D,0)),
+      ln2g:reg(P(1,D,0)), ln2b:reg(P(1,D,0)),
+      fc:reg(P(D,4*D,0.02)), fcb:reg(P(1,4*D,0)),
+      fp:reg(P(4*D,D,0.02)), fpb:reg(P(1,D,0)),
+    };
+    b.ln1g.w.fill(1); b.ln2g.w.fill(1);
+    m.blocks.push(b);
+  }
+  m.lnfg=reg(P(1,D,0)); m.lnfg.w.fill(1); m.lnfb=reg(P(1,D,0));
+  m.head=reg(P(D,V,0.02)); m.headb=reg(P(1,V,0));
+  m.nParams=m.params.reduce((s,p)=>s+p.w.length,0);
+  m.t=0; // adam timestep
+  return m;
+}
+
+/* layernorm forward over rows of N×D; returns {y, cache} */
+function lnFwd(X,N,D,g,b){
+  const y=new Float32Array(N*D), mean=new Float32Array(N), istd=new Float32Array(N),
+        xhat=new Float32Array(N*D);
+  for(let n=0;n<N;n++){ const o=n*D; let mu=0; for(let d=0;d<D;d++) mu+=X[o+d]; mu/=D;
+    let vr=0; for(let d=0;d<D;d++){ const z=X[o+d]-mu; vr+=z*z; } vr/=D;
+    const is=1/Math.sqrt(vr+1e-5); mean[n]=mu; istd[n]=is;
+    for(let d=0;d<D;d++){ const xh=(X[o+d]-mu)*is; xhat[o+d]=xh; y[o+d]=xh*g[d]+b[d]; } }
+  return {y,cache:{X,xhat,istd,N,D,g}};
+}
+function lnBwd(dY,cache,dg,db){
+  const {xhat,istd,N,D,g}=cache; const dX=new Float32Array(N*D);
+  for(let n=0;n<N;n++){ const o=n*D; let dxhatDot=0, dxhatSum=0;
+    for(let d=0;d<D;d++){ const dxh=dY[o+d]*g[d]; dxhatSum+=dxh; dxhatDot+=dxh*xhat[o+d];
+      dg[d]+=dY[o+d]*xhat[o+d]; db[d]+=dY[o+d]; }
+    const is=istd[n];
+    for(let d=0;d<D;d++){ const dxh=dY[o+d]*g[d];
+      dX[o+d]=is*(dxh - dxhatSum/D - xhat[o+d]*dxhatDot/D); } }
+  return dX;
+}
+function gelu(x){ return 0.5*x*(1+Math.tanh(0.7978845608*(x+0.044715*x*x*x))); }
+function geluGrad(x){ const k=0.7978845608, c=0.044715;
+  const t=Math.tanh(k*(x+c*x*x*x)); const sech2=1-t*t;
+  return 0.5*(1+t) + 0.5*x*sech2*k*(1+3*c*x*x); }
+
+/* full forward over a batch of token rows; idx[N], pos[N]; returns logits + caches */
+function forward(m,idx,pos,N){
+  const {D,H,L,T,V,hd}=m;
+  let X=new Float32Array(N*D);
+  for(let n=0;n<N;n++){ const to=idx[n]*D, po=pos[n]*D, o=n*D;
+    for(let d=0;d<D;d++) X[o+d]=m.tok.w[to+d]+m.pos.w[po+d]; }
+  const caches={idx,pos,N,X0:X,blocks:[]};
+  for(let l=0;l<L;l++){
+    const b=m.blocks[l], bc={};
+    // ln1
+    const ln1=lnFwd(X,N,D,b.ln1g.w,b.ln1b.w); bc.ln1=ln1.cache;
+    // qkv
+    let qkv=mm(ln1.y,b.qkv.w,N,D,3*D);
+    for(let n=0;n<N;n++){const o=n*3*D;for(let d=0;d<3*D;d++)qkv[o+d]+=b.qkvb.w[d];}
+    bc.ln1y=ln1.y; bc.qkv=qkv;
+    const q=new Float32Array(N*D),k=new Float32Array(N*D),v=new Float32Array(N*D);
+    for(let n=0;n<N;n++){const o3=n*3*D,o=n*D;for(let d=0;d<D;d++){q[o+d]=qkv[o3+d];k[o+d]=qkv[o3+D+d];v[o+d]=qkv[o3+2*D+d];}}
+    bc.q=q;bc.k=k;bc.v=v;
+    // attention per (batch,head); N must be B*T
+    const B=N/T, scale=1/Math.sqrt(hd), att=new Float32Array(N*D), probs=[];
+    for(let bi=0;bi<B;bi++) for(let h=0;h<H;h++){
+      const Pm=new Float32Array(T*T);
+      for(let t1=0;t1<T;t1++){ const r1=(bi*T+t1)*D+h*hd; let mx=-1e30;
+        for(let t2=0;t2<=t1;t2++){ const r2=(bi*T+t2)*D+h*hd; let s=0;
+          for(let c=0;c<hd;c++) s+=q[r1+c]*k[r2+c]; s*=scale; Pm[t1*T+t2]=s; if(s>mx)mx=s; }
+        let sum=0; for(let t2=0;t2<=t1;t2++){ const e=Math.exp(Pm[t1*T+t2]-mx); Pm[t1*T+t2]=e; sum+=e; }
+        for(let t2=0;t2<=t1;t2++) Pm[t1*T+t2]/=sum;
+        const ro=(bi*T+t1)*D+h*hd;
+        for(let c=0;c<hd;c++){ let acc=0; for(let t2=0;t2<=t1;t2++) acc+=Pm[t1*T+t2]*v[(bi*T+t2)*D+h*hd+c]; att[ro+c]=acc; } }
+      probs.push(Pm);
+    }
+    bc.probs=probs; bc.att=att; bc.B=B;
+    // proj
+    let pj=mm(att,b.proj.w,N,D,D); for(let n=0;n<N;n++){const o=n*D;for(let d=0;d<D;d++)pj[o+d]+=b.projb.w[d];}
+    // residual 1
+    const X1=new Float32Array(N*D); for(let i=0;i<N*D;i++) X1[i]=X[i]+pj[i];
+    bc.X1=X1;
+    // ln2
+    const ln2=lnFwd(X1,N,D,b.ln2g.w,b.ln2b.w); bc.ln2=ln2.cache; bc.ln2y=ln2.y;
+    // mlp
+    let hpre=mm(ln2.y,b.fc.w,N,D,4*D); for(let n=0;n<N;n++){const o=n*4*D;for(let d=0;d<4*D;d++)hpre[o+d]+=b.fcb.w[d];}
+    const hact=new Float32Array(N*4*D); for(let i=0;i<N*4*D;i++) hact[i]=gelu(hpre[i]);
+    bc.hpre=hpre; bc.hact=hact;
+    let mo=mm(hact,b.fp.w,N,4*D,D); for(let n=0;n<N;n++){const o=n*D;for(let d=0;d<D;d++)mo[o+d]+=b.fpb.w[d];}
+    // residual 2
+    const X2=new Float32Array(N*D); for(let i=0;i<N*D;i++) X2[i]=X1[i]+mo[i];
+    bc.Xin=X; bc.X2=X2;
+    caches.blocks.push(bc);
+    X=X2;
+  }
+  // final ln + head
+  const lnf=lnFwd(X,N,D,m.lnfg.w,m.lnfb.w); caches.lnf=lnf.cache; caches.lnfy=lnf.y; caches.Xfinal=X;
+  let logits=mm(lnf.y,m.head.w,N,D,V); for(let n=0;n<N;n++){const o=n*V;for(let d=0;d<V;d++)logits[o+d]+=m.headb.w[d];}
+  caches.logits=logits;
+  return caches;
+}
+
+/* cross-entropy loss + dlogits; targets[N] (or -1 to ignore) */
+function lossAndGrad(m,caches,targets,N){
+  const V=m.V, logits=caches.logits, dlogits=new Float32Array(N*V);
+  let loss=0, count=0;
+  for(let n=0;n<N;n++){ const o=n*V; let mx=-1e30;
+    for(let d=0;d<V;d++) if(logits[o+d]>mx) mx=logits[o+d];
+    let sum=0; for(let d=0;d<V;d++) sum+=Math.exp(logits[o+d]-mx);
+    const tgt=targets[n];
+    for(let d=0;d<V;d++){ const p=Math.exp(logits[o+d]-mx)/sum; dlogits[o+d]=p; }
+    if(tgt>=0){ loss+=-(logits[o+tgt]-mx-Math.log(sum)); dlogits[o+tgt]-=1; count++; }
+  }
+  // average over counted tokens
+  const inv=1/Math.max(1,count); for(let i=0;i<N*V;i++) dlogits[i]*=inv;
+  caches._dlogits=dlogits;
+  return loss*inv;
+}
+
+/* full backward; accumulates grads into m params (assumes grads zeroed) */
+function backward(m,caches){
+  const {D,H,L,T,V,hd}=m, N=caches.N, dlogits=caches._dlogits;
+  // head
+  for(let n=0;n<N;n++){const o=n*V;for(let d=0;d<V;d++)m.headb.g[d]+=dlogits[o+d];}
+  addInto(m.head.g, mmAt(caches.lnfy,dlogits,N,D,V));
+  let dX=mmBt(dlogits,m.head.w,N,D,V);
+  // final ln
+  dX=lnBwd(dX,caches.lnf,m.lnfg.g,m.lnfb.g);
+  // blocks in reverse
+  for(let l=L-1;l>=0;l--){
+    const b=m.blocks[l], bc=caches.blocks[l];
+    // dX is grad wrt X2 (block output). residual2: X2=X1+mo
+    let dX1=dX.slice(), dmo=dX; // both share dX2
+    // mlp out linear: mo = hact·fp + fpb
+    for(let n=0;n<N;n++){const o=n*D;for(let d=0;d<D;d++)b.fpb.g[d]+=dmo[o+d];}
+    addInto(b.fp.g, mmAt(bc.hact,dmo,N,4*D,D));
+    let dhact=mmBt(dmo,b.fp.w,N,4*D,D);
+    // gelu
+    const dhpre=new Float32Array(N*4*D);
+    for(let i=0;i<N*4*D;i++) dhpre[i]=dhact[i]*geluGrad(bc.hpre[i]);
+    // fc linear
+    for(let n=0;n<N;n++){const o=n*4*D;for(let d=0;d<4*D;d++)b.fcb.g[d]+=dhpre[o+d];}
+    addInto(b.fc.g, mmAt(bc.ln2y,dhpre,N,D,4*D));
+    let dln2y=mmBt(dhpre,b.fc.w,N,D,4*D);
+    // ln2 backward -> adds to dX1
+    const dln2=lnBwd(dln2y,bc.ln2,b.ln2g.g,b.ln2b.g);
+    for(let i=0;i<N*D;i++) dX1[i]+=dln2[i];
+    // residual1: X1 = X + pj ; dX1 flows to both X(input) and pj
+    let dpj=dX1, dXin=dX1.slice();
+    // proj linear: pj = att·proj + projb
+    for(let n=0;n<N;n++){const o=n*D;for(let d=0;d<D;d++)b.projb.g[d]+=dpj[o+d];}
+    addInto(b.proj.g, mmAt(bc.att,dpj,N,D,D));
+    let datt=mmBt(dpj,b.proj.w,N,D,D);
+    // attention backward
+    const B=bc.B, scale=1/Math.sqrt(hd);
+    const dq=new Float32Array(N*D),dk=new Float32Array(N*D),dv=new Float32Array(N*D);
+    let pi=0;
+    for(let bi=0;bi<B;bi++) for(let h=0;h<H;h++){
+      const Pm=bc.probs[pi++];
+      for(let t1=0;t1<T;t1++){
+        const ro=(bi*T+t1)*D+h*hd;
+        const dProw=new Float32Array(T);
+        for(let t2=0;t2<=t1;t2++){ let dp=0; const r2=(bi*T+t2)*D+h*hd;
+          for(let c=0;c<hd;c++){ const dout=datt[ro+c]; dp+=dout*bc.v[r2+c]; dv[r2+c]+=Pm[t1*T+t2]*dout; }
+          dProw[t2]=dp; }
+        let dot=0; for(let t2=0;t2<=t1;t2++) dot+=Pm[t1*T+t2]*dProw[t2];
+        for(let t2=0;t2<=t1;t2++){ const dS=Pm[t1*T+t2]*(dProw[t2]-dot)*scale; if(dS===0)continue;
+          const r1=(bi*T+t1)*D+h*hd, r2=(bi*T+t2)*D+h*hd;
+          for(let c=0;c<hd;c++){ dq[r1+c]+=dS*bc.k[r2+c]; dk[r2+c]+=dS*bc.q[r1+c]; } } }
+    }
+    // assemble dqkv [N*3D]
+    const dqkv=new Float32Array(N*3*D);
+    for(let n=0;n<N;n++){const o3=n*3*D,o=n*D;for(let d=0;d<D;d++){dqkv[o3+d]=dq[o+d];dqkv[o3+D+d]=dk[o+d];dqkv[o3+2*D+d]=dv[o+d];}}
+    // qkv linear backward
+    for(let n=0;n<N;n++){const o=n*3*D;for(let d=0;d<3*D;d++)b.qkvb.g[d]+=dqkv[o+d];}
+    addInto(b.qkv.g, mmAt(bc.ln1y,dqkv,N,D,3*D));
+    let dln1y=mmBt(dqkv,b.qkv.w,N,D,3*D);
+    // ln1 backward -> adds to dXin
+    const dln1=lnBwd(dln1y,bc.ln1,b.ln1g.g,b.ln1b.g);
+    for(let i=0;i<N*D;i++) dXin[i]+=dln1[i];
+    dX=dXin; // grad wrt this block's input X
+  }
+  // embeddings
+  const {idx,pos}=caches;
+  for(let n=0;n<N;n++){ const to=idx[n]*D, po=pos[n]*D, o=n*D;
+    for(let d=0;d<D;d++){ m.tok.g[to+d]+=dX[o+d]; m.pos.g[po+d]+=dX[o+d]; } }
+}
+function addInto(dst,src){ for(let i=0;i<dst.length;i++) dst[i]+=src[i]; }
+function zeroGrads(m){ for(const p of m.params) p.g.fill(0); }
+
+/* AdamW step */
+function adamStep(m,lr,wd){
+  m.t++; const b1=0.9,b2=0.999,eps=1e-8;
+  const c1=1-Math.pow(b1,m.t), c2=1-Math.pow(b2,m.t);
+  // grad clip (global L2)
+  let gn=0; for(const p of m.params){ const g=p.g; for(let i=0;i<g.length;i++) gn+=g[i]*g[i]; }
+  gn=Math.sqrt(gn); const clip = gn>1 ? 1/gn : 1;
+  for(const p of m.params){ const w=p.w,g=p.g,M=p.m,Vv=p.v;
+    const decay = p.cols>1 && p.rows>1 ? wd : 0; // weight-decay only matrices, not biases/norms
+    for(let i=0;i<w.length;i++){ const gi=g[i]*clip;
+      M[i]=b1*M[i]+(1-b1)*gi; Vv[i]=b2*Vv[i]+(1-b2)*gi*gi;
+      const mh=M[i]/c1, vh=Vv[i]/c2;
+      w[i]-= lr*(mh/(Math.sqrt(vh)+eps) + decay*w[i]); } }
+}
+
+/* sample a training batch: B sequences of length T from `data` */
+function sampleBatch(data,B,T){
+  const idx=new Int32Array(B*T), tgt=new Int32Array(B*T), pos=new Int32Array(B*T);
+  for(let bi=0;bi<B;bi++){ const start=Math.floor(RNG()*(data.length-T-1));
+    for(let t=0;t<T;t++){ const n=bi*T+t; idx[n]=data[start+t]; tgt[n]=data[start+t+1]; pos[n]=t; } }
+  return {idx,tgt,pos,N:B*T};
+}
+
+/* one training step; returns loss */
+function trainStep(m,B){
+  const T=m.T; const {idx,tgt,pos,N}=sampleBatch(dataTrain,B,T);
+  const caches=forward(m,idx,pos,N);
+  const loss=lossAndGrad(m,caches,tgt,N);
+  zeroGrads(m); backward(m,caches);
+  adamStep(m, m.cfg.lr, m.cfg.wd);
+  return loss;
+}
+/* held-out loss (forward only) */
+function valLoss(m,B){
+  const T=m.T; const {idx,tgt,pos,N}=sampleBatch(dataVal,Math.min(B,4),T);
+  const caches=forward(m,idx,pos,N);
+  return lossAndGrad(m,caches,tgt,N);
+}
+
+/* autoregressive generation from a prompt string */
+function generate(m,prompt,nNew,temp){
+  const T=m.T; let ctx=encode(prompt); if(ctx.length===0) ctx=[stoi[' ']||0];
+  let out='';
+  for(let s=0;s<nNew;s++){
+    const win=ctx.slice(-T); const Tn=win.length;
+    const idx=new Int32Array(Tn), pos=new Int32Array(Tn);
+    for(let t=0;t<Tn;t++){ idx[t]=win[t]; pos[t]=t; }
+    const caches=forward(m,idx,pos,Tn);
+    const V=m.V, o=(Tn-1)*V, logits=caches.logits;
+    let mx=-1e30; for(let d=0;d<V;d++) if(logits[o+d]>mx)mx=logits[o+d];
+    let sum=0; const pr=new Float32Array(V);
+    for(let d=0;d<V;d++){ const e=Math.exp((logits[o+d]-mx)/temp); pr[d]=e; sum+=e; }
+    let r=RNG()*sum, pick=0; for(let d=0;d<V;d++){ r-=pr[d]; if(r<=0){pick=d;break;} pick=d; }
+    ctx.push(pick); out+=itos[pick];
+  }
+  return out;
+}
+
+/* ============================ headless harness ============================ */
+window.__gpt={
+  makeModel, forward, lossAndGrad, backward, generate, VOCAB, CORPUS,
+  cfgTiny(){ return {dModel:16,nHead:2,nLayer:1,block:6,lr:3e-3,wd:1e-2}; },
+  /* numerical gradient check — the proof backprop is correct */
+  gradCheck(){
+    const saved=RNG; RNG=mulberry32(7);
+    const m=makeModel({dModel:16,nHead:2,nLayer:1,block:6,lr:1e-3,wd:0});
+    const T=m.T,B=2,N=B*T;
+    const idx=new Int32Array(N),tgt=new Int32Array(N),pos=new Int32Array(N);
+    for(let bi=0;bi<B;bi++)for(let t=0;t<T;t++){const n=bi*T+t;idx[n]=Math.floor(RNG()*VOCAB);tgt[n]=Math.floor(RNG()*VOCAB);pos[n]=t;}
+    const c=forward(m,idx,pos,N); lossAndGrad(m,c,tgt,N); zeroGrads(m); backward(m,c);
+    const eps=1e-3; let maxRel=0, checked=0; const samples=[];
+    // only judge gradients of meaningful magnitude — relative error is meaningless
+    // for near-zero grads, where finite-difference rounding dominates.
+    const pick=[m.head,m.tok,m.pos,m.blocks[0].qkv,m.blocks[0].fc,m.blocks[0].ln1g,m.blocks[0].proj,m.blocks[0].fp];
+    for(const p of pick){ for(let trial=0;trial<8;trial++){ const i=Math.floor(RNG()*p.w.length);
+      const orig=p.w[i];
+      p.w[i]=orig+eps; const cp=forward(m,idx,pos,N); const lp=lossAndGrad(m,cp,tgt,N);
+      p.w[i]=orig-eps; const cm=forward(m,idx,pos,N); const lm=lossAndGrad(m,cm,tgt,N);
+      p.w[i]=orig;
+      const num=(lp-lm)/(2*eps), ana=p.g[i];
+      if(Math.abs(ana)<1e-3 && Math.abs(num)<1e-3) continue; // skip noise floor
+      const rel=Math.abs(num-ana)/(Math.max(1e-6,Math.abs(num)+Math.abs(ana)));
+      if(rel>maxRel)maxRel=rel; checked++; if(samples.length<6)samples.push({num:+num.toFixed(5),ana:+ana.toFixed(5)});
+    }}
+    RNG=saved;
+    return {maxRelError:+maxRel.toFixed(5), checked, ok:maxRel<0.02, samples};
+  },
+  /* overfit a tiny snippet: loss should collapse toward 0 */
+  overfit(steps=120){
+    const saved=RNG; RNG=mulberry32(3);
+    const m=makeModel({dModel:32,nHead:2,nLayer:1,block:16,lr:5e-3,wd:0});
+    const snippet=encode("We hold these truths to be self-evident, that all men are created equal");
+    const T=m.T; const losses=[];
+    for(let s=0;s<steps;s++){ const start=s%(snippet.length-T-1);
+      const idx=new Int32Array(T),tgt=new Int32Array(T),pos=new Int32Array(T);
+      for(let t=0;t<T;t++){idx[t]=snippet[start+t];tgt[t]=snippet[start+t+1];pos[t]=t;}
+      const c=forward(m,idx,pos,T); const loss=lossAndGrad(m,c,tgt,T); zeroGrads(m); backward(m,c); adamStep(m,m.cfg.lr,0);
+      if(s%20===0||s===steps-1) losses.push(+loss.toFixed(3)); }
+    RNG=saved; return {losses, final:losses[losses.length-1]};
+  },
+  /* real-corpus learning: train N steps, report train+val loss trajectory */
+  trainCorpus(cfg,steps=300,B=12){
+    const saved=RNG; RNG=mulberry32(1776);
+    const m=makeModel(cfg); const tr=[],va=[]; const t0=performance?0:0;
+    for(let s=0;s<steps;s++){ const loss=trainStep(m,B);
+      if(s%30===0||s===steps-1){ tr.push(+loss.toFixed(3)); va.push(+valLoss(m,B).toFixed(3)); } }
+    const sample=generate(m,"We hold these truths",120,0.7);
+    RNG=saved; return {params:m.nParams, train:tr, val:va, sample};
+  }
+};
+
+/* ============================ live UI ============================ */
+const el=id=>document.getElementById(id);
+const lossC=el('loss'), lossX=lossC.getContext('2d');
+const attnC=el('attn'), attnX=attnC.getContext('2d');
+let DPR=Math.min(2,window.devicePixelRatio||1);
+function fit(c){ const r=c.getBoundingClientRect(); c.width=r.width*DPR; c.height=r.height*DPR;
+  c.getContext('2d').setTransform(DPR,0,0,DPR,0,0); return r; }
+function fitAll(){ fit(lossC); fit(attnC); }
+window.addEventListener('resize',fitAll);
+
+/* Training runs in a Web Worker so the UI never freezes. The verified engine
+   functions above are the SINGLE source of truth — we stringify them into the
+   worker so the exact same (grad-checked) code trains there. */
+const CFG={dModel:48,nHead:4,nLayer:2,block:32,lr:3e-3,wd:1e-2};
+const LIVE={B:8, speed:2, temp:0.8, prompt:'We hold these truths', genLen:90, sampleEvery:8};
+let twin=null, running=false, started=false, step=0, worker=null;
+const trainHist=[], valHist=[]; let lastAttn=null;
+
+const WORKER_GLUE=`
+let model=null,cfg=null,running=false,step=0,lastSample=-999;
+function attnSnap(){ const T=model.T; let ctx=encode(cfg.prompt||'We hold').slice(-T); const Tn=ctx.length;
+  const idx=new Int32Array(Tn),pos=new Int32Array(Tn); for(let t=0;t<Tn;t++){idx[t]=ctx[t];pos[t]=t;}
+  const c=forward(model,idx,pos,Tn); const bc=c.blocks[c.blocks.length-1]; return {P:Array.from(bc.probs[0]),T:Tn}; }
+function loop(){ if(!running) return; const t0=Date.now(); let loss=0;
+  for(let i=0;i<cfg.speed;i++){ loss=trainStep(model,cfg.B); step++; }
+  const tps=(cfg.speed*cfg.B*model.T)/((Date.now()-t0)/1000);
+  let val=null; if(step%30<cfg.speed) val=valLoss(model,cfg.B);
+  postMessage({type:'progress',step,loss,val,tps});
+  if(step-lastSample>=cfg.sampleEvery){ lastSample=step;
+    postMessage({type:'sample',step,text:generate(model,cfg.prompt,cfg.genLen,cfg.temp),attn:attnSnap()}); }
+  setTimeout(loop,0); }
+onmessage=e=>{ const d=e.data;
+  if(d.cmd==='init'){ cfg=d.cfg; RNG=mulberry32(1776); model=makeModel(cfg); step=0; lastSample=-999; postMessage({type:'ready',params:model.nParams}); }
+  else if(d.cmd==='start'){ if(!running){running=true; loop();} }
+  else if(d.cmd==='pause'){ running=false; }
+  else if(d.cmd==='reset'){ running=false; RNG=mulberry32(d.seed||1776); model=makeModel(cfg); step=0; lastSample=-999; postMessage({type:'ready',params:model.nParams,reset:true}); }
+  else if(d.cmd==='hyper'){ for(const k in d.set) cfg[k]=d.set[k]; }
+  else if(d.cmd==='gen'){ postMessage({type:'sample',step,text:generate(model,d.prompt,d.n,d.temp),attn:attnSnap(),manual:true}); } };
+`;
+function buildWorkerSource(){
+  const fns=[mulberry32,randn,mm,mmBt,mmAt,P,makeModel,lnFwd,lnBwd,gelu,geluGrad,
+             forward,lossAndGrad,backward,addInto,zeroGrads,adamStep,sampleBatch,trainStep,valLoss,generate];
+  let s='';
+  s+='const CORPUS='+JSON.stringify(CORPUS)+';\n';
+  s+="const chars=Array.from(new Set(CORPUS.split(''))).sort();const stoi={};chars.forEach((c,i)=>stoi[c]=i);const itos=chars;const VOCAB=chars.length;\n";
+  s+="const encode=s=>Array.from(s).map(c=>stoi[c]??0);\n";
+  s+="const dataAll=encode(CORPUS);const nTrain=Math.floor(dataAll.length*0.9);let dataTrain=dataAll.slice(0,nTrain),dataVal=dataAll.slice(nTrain);\n";
+  s+='let RNG=mulberry32(1776);\n';
+  s+=fns.map(f=>f.toString()).join('\n')+'\n';
+  s+=WORKER_GLUE;
+  return s;
+}
+function startWorker(){
+  if(worker) worker.terminate();
+  worker=new Worker(URL.createObjectURL(new Blob([buildWorkerSource()],{type:'text/javascript'})));
+  worker.onmessage=onWorker;
+  worker.postMessage({cmd:'init', cfg:Object.assign({}, CFG, LIVE)});
+}
+function ensureStarted(){ if(!started){ started=true; startWorker(); } }
+function onWorker(e){ const d=e.data;
+  if(d.type==='ready'){ el('s-params').textContent=(d.params/1000).toFixed(0)+'k';
+    if(d.reset){ step=0; trainHist.length=0; valHist.length=0; lastAttn=null;
+      el('s-step').textContent='0'; el('s-loss').textContent='—'; el('s-val').textContent='—'; el('s-tps').textContent='—';
+      el('genTag').textContent='untrained'; el('gen').textContent='…'; drawLoss(); drawAttn(); } }
+  else if(d.type==='progress'){ step=d.step;
+    trainHist.push(d.loss); if(trainHist.length>6000) trainHist.shift();
+    if(d.val!=null){ valHist.push({x:step,y:d.val}); if(valHist.length>1200)valHist.shift(); el('s-val').textContent=d.val.toFixed(3); }
+    el('s-step').textContent=step; el('s-loss').textContent=d.loss.toFixed(3);
+    el('s-tps').textContent=d.tps?Math.round(d.tps).toLocaleString():'—';
+    el('genTag').textContent='step '+step; drawLoss(); }
+  else if(d.type==='sample'){ const p=LIVE.prompt;
+    el('gen').innerHTML='<span style="color:#7c8bbf">'+escapeHtml(p)+'</span>'+escapeHtml(d.text);
+    if(d.attn){ lastAttn=d.attn; drawAttn(); } }
+}
+
+function drawLoss(){
+  const w=lossC.clientWidth,h=lossC.clientHeight; lossX.clearRect(0,0,w,h);
+  lossX.strokeStyle='#11183a'; lossX.lineWidth=1;
+  for(let gy=0;gy<=4;gy++){ const y=h*gy/4; lossX.beginPath(); lossX.moveTo(0,y); lossX.lineTo(w,y); lossX.stroke(); }
+  if(trainHist.length<2){ return; }
+  // y-scale: 0..max(initial, recent)
+  let lo=Infinity,hi=-Infinity; for(const v of trainHist){ if(v<lo)lo=v; if(v>hi)hi=v; }
+  hi=Math.max(hi, Math.log(VOCAB)); lo=Math.min(lo, 0.2*lo);
+  const pad=v=>h-6-((v-lo)/(hi-lo+1e-6))*(h-12);
+  // train (downsample to width)
+  lossX.beginPath(); const stepX=Math.max(1,Math.floor(trainHist.length/w));
+  let j=0; for(let i=0;i<trainHist.length;i+=stepX){ const x=j*(w/(trainHist.length/stepX)); const y=pad(trainHist[i]);
+    j?lossX.lineTo(x,y):lossX.moveTo(x,y); j++; }
+  lossX.strokeStyle='#7da2ff'; lossX.lineWidth=1.5; lossX.stroke();
+  // val markers
+  if(valHist.length>1){ lossX.beginPath();
+    for(let i=0;i<valHist.length;i++){ const x=(valHist[i].x/Math.max(1,step))*w; const y=pad(valHist[i].y);
+      i?lossX.lineTo(x,y):lossX.moveTo(x,y); }
+    lossX.strokeStyle='#e8c34a'; lossX.lineWidth=1.5; lossX.stroke(); }
+  // legend
+  lossX.font='10px "Courier New"'; lossX.fillStyle='#7da2ff'; lossX.fillText('train',6,12);
+  lossX.fillStyle='#e8c34a'; lossX.fillText('held-out',46,12);
+}
+
+function drawAttn(){
+  if(!lastAttn){ attnX.clearRect(0,0,attnC.clientWidth,attnC.clientHeight); return; }
+  const {P,T}=lastAttn; const w=attnC.clientWidth,h=attnC.clientHeight;
+  attnX.clearRect(0,0,w,h); const cw=w/T, ch=h/T;
+  for(let i=0;i<T;i++)for(let j=0;j<T;j++){ const a=P[i*T+j];
+    if(j>i){ attnX.fillStyle='#070a16'; }
+    else { const c=Math.min(1,a*1.6); attnX.fillStyle=`rgba(${Math.round(60+195*c)},${Math.round(120+135*c)},255,1)`; }
+    attnX.fillRect(j*cw,i*ch,Math.ceil(cw),Math.ceil(ch)); }
+}
+
+function escapeHtml(s){ return s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+function regenTwin(){ const p=LIVE.prompt; el('twin').textContent=p+generate(twin,p,90,LIVE.temp); }
+function setPrompt(){ LIVE.prompt=el('prompt').value||'We hold these truths';
+  if(worker) worker.postMessage({cmd:'hyper',set:{prompt:LIVE.prompt}});
+  if(started && worker) worker.postMessage({cmd:'gen',prompt:LIVE.prompt,n:160,temp:LIVE.temp});
+  regenTwin(); }
+
+/* controls — all training commands go to the worker */
+el('play').addEventListener('click',()=>{ ensureStarted(); running=!running;
+  el('play').classList.toggle('on',running);
+  el('play').textContent=running?'❚❚ PAUSE TRAINING':'▶ RESUME TRAINING';
+  worker.postMessage({cmd:running?'start':'pause'}); });
+el('reset').addEventListener('click',()=>{ running=false; el('play').classList.remove('on');
+  el('play').textContent='▶ DECLARE INDEPENDENCE';
+  if(worker) worker.postMessage({cmd:'reset',seed:1776}); else { trainHist.length=0; valHist.length=0; drawLoss(); } });
+el('speed').addEventListener('input',e=>{ LIVE.speed=+e.target.value; el('spv').textContent=LIVE.speed;
+  if(worker) worker.postMessage({cmd:'hyper',set:{speed:LIVE.speed}}); });
+el('temp').addEventListener('input',e=>{ LIVE.temp=(+e.target.value)/100; el('tpv').textContent=LIVE.temp.toFixed(2);
+  if(worker) worker.postMessage({cmd:'hyper',set:{temp:LIVE.temp}}); regenTwin(); });
+el('regen').addEventListener('click',setPrompt);
+el('prompt').addEventListener('keydown',e=>{ if(e.key==='Enter') setPrompt(); });
+el('go').addEventListener('click',()=>{ el('intro').classList.add('hidden'); ensureStarted();
+  running=true; el('play').classList.add('on'); el('play').textContent='❚❚ PAUSE TRAINING';
+  worker.postMessage({cmd:'start'}); });
+el('reopen').addEventListener('click',()=>el('intro').classList.remove('hidden'));
+
+/* boot — build the frozen twin on the main thread (it never trains) */
+fitAll();
+RNG=mulberry32(424242); twin=makeModel(Object.assign({},CFG));
+el('s-params').textContent=(twin.nParams/1000).toFixed(0)+'k';
+regenTwin();
+el('gen').innerHTML='<span style="color:#7c8bbf">Press “Declare Independence” — it begins from noise and teaches itself to write.</span>';
+drawLoss(); drawAttn();
+</script>
+</body>
+</html>
