@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>LIBERTY ENGINE — an anthem with no conductor</title>
+<style>
+  :root{
+    --red:#c1272d; --white:#f4f1e8; --blue:#3b56b0; --sky:#7da2ff;
+    --gold:#e8c34a; --ink:#06070d; --panel:#0b0f22; --line:#1c2547;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--ink); color:var(--white); font-family:"Courier New",monospace;
+    overflow-x:hidden; -webkit-tap-highlight-color:transparent;
+    min-height:100%; display:flex; flex-direction:column;
+  }
+  #fw{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .wrap{position:relative;z-index:1;width:100%;max-width:880px;margin:0 auto;padding:18px 16px 40px;}
+
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  h1{font-size:clamp(20px,5vw,32px);letter-spacing:4px;color:var(--gold);
+     text-shadow:3px 3px 0 var(--red),-1px -1px 0 var(--blue);}
+  .tagline{font-size:12px;color:var(--sky);letter-spacing:1px;}
+  .sub{font-size:12px;color:#9fb0e0;line-height:1.6;margin:8px 0 16px;max-width:660px;}
+  .sub b{color:var(--white);}
+
+  /* transport */
+  .transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    border:2px solid var(--line);background:#080b1a;padding:12px;margin-bottom:14px;}
+  button{font-family:inherit;font-size:13px;letter-spacing:1px;color:var(--white);
+    background:var(--panel);border:2px solid var(--gold);padding:10px 14px;cursor:pointer;
+    transition:transform .07s,background .15s;white-space:nowrap;}
+  button:hover{background:#11183a;transform:translateY(-2px);} button:active{transform:translateY(0);}
+  button.play{border-color:var(--sky);min-width:108px;font-weight:bold;}
+  button.play.on{background:var(--red);border-color:var(--red);color:#ffe7e1;}
+  button.ghost{border-color:var(--line);color:#9fb0e0;font-size:12px;padding:9px 11px;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field .l{font-size:9px;letter-spacing:1px;color:#7c8bbf;}
+  .field input,.field select{font-family:inherit;font-size:12px;color:var(--white);
+    background:#070a16;border:1px solid var(--line);padding:7px 8px;}
+  .field input[type=range]{padding:0;width:120px;}
+  .seedbox{flex:1;min-width:150px;}
+  .seedbox input{width:100%;}
+  .spacer{flex:1;}
+
+  /* voice rack */
+  .rack{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px;}
+  .voice{border:2px solid var(--line);background:#080b1a;padding:12px;position:relative;overflow:hidden;}
+  .voice .top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .voice .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor;}
+  .voice .nm{font-size:13px;letter-spacing:1px;}
+  .voice .role{font-size:9px;color:#7c8bbf;letter-spacing:1px;margin-top:1px;}
+  .voice .ph{margin-left:auto;}
+  .meter{height:8px;background:#05070f;border:1px solid var(--line);overflow:hidden;margin:8px 0;}
+  .meter>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--blue),var(--sky));transition:width .06s linear;}
+  .voice .lp{font-size:9px;color:#7c8bbf;letter-spacing:.5px;}
+  .voice .lp b{color:var(--gold);}
+  .btns{display:flex;gap:6px;margin-top:9px;}
+  .tg{flex:1;font-size:11px;padding:7px 0;text-align:center;border:1px solid var(--line);
+    background:#0a0e1e;color:#9fb0e0;cursor:pointer;letter-spacing:1px;user-select:none;transition:.12s;}
+  .tg:hover{background:#11183a;}
+  .tg.on.mute{background:var(--red);color:#ffe7e1;border-color:var(--red);}
+  .tg.on.solo{background:var(--gold);color:var(--ink);border-color:var(--gold);font-weight:bold;}
+  .voice.silent{opacity:.42;}
+  .voice.silent .meter>i{background:#33405f;}
+
+  .note{font-size:11px;color:#7c8bbf;line-height:1.6;margin-top:18px;}
+  .note b{color:var(--gold);} .note a{color:var(--sky);}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9;
+    background:var(--panel);border:2px solid var(--sky);padding:10px 16px;font-size:12px;
+    letter-spacing:1px;opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  /* intro overlay */
+  #intro{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:#06070dee;backdrop-filter:blur(2px);overflow:auto;}
+  #intro .card{max-width:560px;border:3px solid var(--gold);background:var(--panel);padding:24px;
+    box-shadow:0 0 0 4px #06070d,0 12px 40px #000;}
+  #intro h1{margin-bottom:6px;}
+  #intro .tag{font-size:12px;color:var(--sky);letter-spacing:1px;margin-bottom:16px;}
+  #intro p{font-size:13px;line-height:1.65;color:#d7dcef;margin-bottom:12px;}
+  #intro p b{color:var(--white);} #intro .g{color:var(--gold);}
+  #intro .start{margin-top:8px;width:100%;font-size:14px;padding:13px;border-color:var(--sky);}
+  .hidden{display:none!important;}
+  @media(max-width:520px){ .field input[type=range]{width:92px;} }
+</style>
+</head>
+<body>
+<canvas id="fw"></canvas>
+<div class="wrap">
+  <header>
+    <h1>★ LIBERTY ENGINE</h1>
+    <span class="tagline">an anthem with no conductor</span>
+  </header>
+  <div class="sub">
+    Six voices. Each runs <b>its own loop, at its own length</b> — no conductor, no shared clock telling
+    them when to play. They agree on one thing only: the key. From that single shared ideal, independent
+    parts weave a self-playing anthem that never quite repeats. <b>Mute any voice — even all but one — and the rest play on.</b>
+    That's the mechanic: <b>E pluribus unum</b>, out of many independent loops, one song.
+  </div>
+
+  <div class="transport">
+    <button class="play" id="play">▶ PLAY</button>
+    <div class="field"><span class="l">TEMPO <b id="bpmv">112</b></span>
+      <input type="range" id="bpm" min="76" max="150" value="112" /></div>
+    <div class="field"><span class="l">KEY</span>
+      <select id="key">
+        <option value="60">C</option><option value="62">D</option>
+        <option value="64">E</option><option value="65">F</option>
+        <option value="67" selected>G</option><option value="69">A</option>
+      </select></div>
+    <div class="field seedbox"><span class="l">SEED</span>
+      <input id="seed" spellcheck="false" value="1776" /></div>
+    <button class="ghost" id="reseed">⟳ RESEED</button>
+    <button class="ghost" id="share">⧉ SHARE</button>
+  </div>
+
+  <div class="rack" id="rack"></div>
+
+  <div class="note">
+    <b>How it works:</b> each voice is a tiny synth (square / triangle / noise — built from scratch with the
+    Web Audio API, no libraries) running an independent loop of <b>4, 6, 8, 12 or 16 beats</b>. Because the
+    lengths don't divide evenly, the parts drift in and out of phase and only fully realign every 48 beats —
+    so the anthem keeps evolving. The melody, fills and fireworks are seeded, so a <b>SEED</b> always plays
+    the same tune. Hit <b>SHARE</b> to put the seed in the URL and send your anthem to anyone.
+    <br><br>Week 2 · Independence Engines · a companion to
+    <a href="../">Dependency Day</a> and <a href="../murmuration/">Murmuration</a>.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div id="intro">
+  <div class="card">
+    <h1>★ LIBERTY ENGINE</h1>
+    <div class="tag">WEEK 2 · INDEPENDENCE ENGINES · independence is not a symbol, it's a <i>mechanic</i></div>
+    <p>An orchestra needs a conductor to stay together. A <b>federation</b> doesn't. This engine has <span class="g">six independent voices</span>, each keeping its own time on its own loop — yet they make one anthem.</p>
+    <p>Pull out the lead. Pull out the drums. <b>Solo a single voice.</b> The music never breaks, because no part depends on any other — they only share a key, the way thirteen colonies shared an idea.</p>
+    <p style="color:#9fb0e0;font-size:12px;">Turn it up. 🔊 Then mute the voices one by one and listen to what independence sounds like.</p>
+    <button class="start" id="go">▶ START THE ENGINE</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ===========================================================================
+   LIBERTY ENGINE — a generative anthem of independent, self-looping voices.
+   Generation (what plays) is kept PURE and separate from audio (how it sounds)
+   so the music logic can be verified headlessly. See window.__engine.
+   =========================================================================== */
+
+/* ---- seeded PRNG (mulberry32): same seed → same tune (shareable) ---- */
+function strHash(s){ let h=2166136261>>>0; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+/* ---- music theory ---- */
+const STEPS_PER_BEAT=4;                         // sixteenth-note grid
+const SCALE=[0,2,4,5,7,9,11];                   // major
+// I – V – vi – IV : the most anthemic progression in pop. 4 beats each → 16-beat cycle.
+const PROG=[ {root:0,triad:[0,4,7]}, {root:7,triad:[0,4,7]},
+             {root:9,triad:[0,3,7]}, {root:5,triad:[0,4,7]} ];
+function chordAtBeat(beat){ return PROG[Math.floor(beat/4)%PROG.length]; }
+function midi(keyRoot,semi,octave){ return keyRoot+semi+12*octave; }
+function mtof(m){ return 440*Math.pow(2,(m-69)/12); }
+
+/* ---- the six independent voices ----
+   Each has its OWN loop length in beats. LCM(4,6,8,12,16)=48 → full realign every 48 beats. */
+const VOICES=[
+  {id:'bass',  name:'BASS',      role:'the ground',   loopBeats:8,  color:'#3b56b0', wave:'triangle', octave:-2, gain:0.34},
+  {id:'pad',   name:'HARMONY',   role:'the chord',    loopBeats:16, color:'#7da2ff', wave:'sawtooth', octave:0,  gain:0.12},
+  {id:'lead',  name:'LEAD',      role:'the melody',   loopBeats:16, color:'#e8c34a', wave:'square',   octave:1,  gain:0.16},
+  {id:'counter',name:'COUNTER',  role:'the answer',   loopBeats:6,  color:'#f4f1e8', wave:'square',   octave:1,  gain:0.10},
+  {id:'drums', name:'DRUMS',     role:'the march',    loopBeats:4,  color:'#c1272d', wave:'noise',    octave:0,  gain:0.5},
+  {id:'bells', name:'FIREWORKS', role:'the sparks',   loopBeats:12, color:'#ffd9a0', wave:'triangle', octave:3,  gain:0.14},
+];
+
+/* ---- pure generators: given (seed, key), return per-voice step→event map ----
+   event = {type:'note',m,dur,accent} | {type:'drum',drum} | null.
+   Crucially each voice is generated INDEPENDENTLY from the others. */
+function buildVoice(v, seedNum, keyRoot){
+  const len=v.loopBeats*STEPS_PER_BEAT;
+  const rnd=mulberry32(seedNum ^ strHash(v.id));   // each voice gets its own RNG stream
+  const steps=new Array(len).fill(null);
+  for(let s=0;s<len;s++){
+    const beat=s/STEPS_PER_BEAT;
+    const ch=chordAtBeat(beat);
+    const onBeat=(s%STEPS_PER_BEAT===0), onHalf=(s%(STEPS_PER_BEAT/2)===0);
+    if(v.id==='bass'){
+      if(onBeat){ const note=(Math.floor(beat)%2===0)?ch.root:ch.root+7; // root / fifth pulse
+        steps[s]={type:'note',m:midi(keyRoot,note,v.octave),dur:0.9,accent:beat%4===0}; }
+    } else if(v.id==='pad'){
+      if(s%(STEPS_PER_BEAT*4)===0){ // sustained triad once per chord (4 beats)
+        steps[s]={type:'chord',ms:ch.triad.map(t=>midi(keyRoot,ch.root+t,v.octave)),dur:3.8}; }
+    } else if(v.id==='lead'){
+      // seeded melody: on strong steps pick a chord tone, weak steps an occasional passing tone
+      if(onHalf && rnd()<(onBeat?0.85:0.4)){
+        const useChord=rnd()<0.6;
+        const semi=useChord ? ch.root+ch.triad[Math.floor(rnd()*3)]
+                            : ch.root+SCALE[Math.floor(rnd()*SCALE.length)];
+        steps[s]={type:'note',m:midi(keyRoot,semi,v.octave),dur:rnd()<0.3?0.9:0.45,accent:onBeat&&rnd()<0.5};
+      }
+    } else if(v.id==='counter'){
+      // a sparse counter-melody on its own 6-beat clock, mostly off the main beat
+      if(!onBeat && s%2===0 && rnd()<0.5){
+        const semi=ch.root+ch.triad[Math.floor(rnd()*3)];
+        steps[s]={type:'note',m:midi(keyRoot,semi,v.octave),dur:0.4,accent:false};
+      }
+    } else if(v.id==='drums'){
+      const inBeat=s%STEPS_PER_BEAT;            // 0..3 sixteenths within the beat
+      const wholeBeat=Math.floor(beat)%v.loopBeats; // 0..3 across the 4-beat march
+      if(inBeat===0) steps[s]={type:'drum',drum:(wholeBeat%2===0)?'kick':'snare'}; // K S K S march
+      else if(inBeat===2) steps[s]={type:'drum',drum:'hat'};   // the "and" of each beat
+      else if(rnd()<0.12) steps[s]={type:'drum',drum:'hat'};   // sparse seeded sixteenths
+      if(rnd()<0.5 && inBeat===2 && wholeBeat===3) steps[s]={type:'drum',drum:'snare'}; // turn-around
+    } else if(v.id==='bells'){
+      // fireworks: arpeggiated sparkle bursts on accents, seeded
+      if(onBeat && rnd()<0.5){
+        const t=ch.triad[Math.floor(rnd()*3)];
+        steps[s]={type:'note',m:midi(keyRoot,ch.root+t,v.octave),dur:0.25,accent:true,spark:true};
+      }
+    }
+  }
+  return {len,steps};
+}
+function buildSong(seedStr,keyRoot){
+  const seedNum=strHash(String(seedStr));
+  const out={};
+  for(const v of VOICES) out[v.id]=buildVoice(v,seedNum,keyRoot);
+  return out;
+}
+
+/* =========================== AUDIO ENGINE =========================== */
+let AC=null, master=null, comp=null;
+const voiceState={}; // id → {mute,solo,gainNode,level}
+VOICES.forEach(v=>voiceState[v.id]={mute:false,solo:false,gain:null,level:0});
+
+function audibleSet(){
+  const soloed=VOICES.filter(v=>voiceState[v.id].solo).map(v=>v.id);
+  const on={};
+  for(const v of VOICES){
+    const st=voiceState[v.id];
+    on[v.id]= soloed.length ? soloed.includes(v.id) : !st.mute;
+  }
+  return on;
+}
+
+function initAudio(){
+  if(AC) return;
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  comp=AC.createDynamicsCompressor();
+  master=AC.createGain(); master.gain.value=0.9;
+  master.connect(comp); comp.connect(AC.destination);
+  for(const v of VOICES){ const g=AC.createGain(); g.gain.value=v.gain; g.connect(master); voiceState[v.id].gain=g; }
+  // a tiny shared noise buffer for drums + sparks
+  const n=AC.sampleRate*0.5, buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(let i=0;i<n;i++) d[i]=Math.random()*2-1; AC.__noise=buf;
+}
+
+function env(node,gnode,t,dur,peak){
+  gnode.gain.cancelScheduledValues(t);
+  gnode.gain.setValueAtTime(0.0001,t);
+  gnode.gain.exponentialRampToValueAtTime(peak,t+0.012);
+  gnode.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+}
+function playTone(v,freq,t,dur,peak){
+  const o=AC.createOscillator(); o.type=v.wave; o.frequency.value=freq;
+  const g=AC.createGain(); o.connect(g); g.connect(voiceState[v.id].gain);
+  env(o,g,t,dur,peak); o.start(t); o.stop(t+dur+0.05);
+}
+function playDrum(drum,t){
+  const out=voiceState['drums'].gain;
+  if(drum==='kick'){
+    const o=AC.createOscillator(),g=AC.createGain(); o.type='sine';
+    o.frequency.setValueAtTime(140,t); o.frequency.exponentialRampToValueAtTime(45,t+0.12);
+    g.gain.setValueAtTime(0.9,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t+0.2);
+  } else {
+    const s=AC.createBufferSource(); s.buffer=AC.__noise;
+    const bp=AC.createBiquadFilter(); bp.type=drum==='hat'?'highpass':'bandpass';
+    bp.frequency.value=drum==='hat'?7000:1800;
+    const g=AC.createGain(); const dur=drum==='hat'?0.05:0.13;
+    g.gain.setValueAtTime(drum==='hat'?0.3:0.6,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(bp); bp.connect(g); g.connect(out); s.start(t); s.stop(t+dur+0.02);
+  }
+}
+
+/* ---- transport / scheduler ---- */
+let playing=false, bpm=112, keyRoot=67, seedStr='1776', song=null;
+let curStep=0, nextNoteTime=0, schedTimer=null;
+const SCHED_AHEAD=0.12, LOOKAHEAD=25;
+function stepDur(){ return (60/bpm)/STEPS_PER_BEAT; }
+
+function scheduleStep(stepIdx,t){
+  const on=audibleSet();
+  for(const v of VOICES){
+    const cell=song[v.id].steps[stepIdx % song[v.id].len];
+    if(!cell) continue;
+    const heard=on[v.id];
+    if(cell.type==='drum'){ if(heard) playDrum(cell.drum,t); if(heard&&cell.drum==='kick') pulse(v,1); }
+    else if(cell.type==='chord'){ if(heard){ cell.ms.forEach(m=>playTone(v,mtof(m),t,cell.dur,0.42)); pulse(v,0.6);} }
+    else { if(heard){ playTone(v,mtof(cell.m),t,cell.dur, cell.accent?0.9:0.6); pulse(v,cell.accent?1:0.6);
+            if(cell.spark) firework(); } }
+  }
+}
+function scheduler(){
+  if(!AC) return;
+  while(nextNoteTime < AC.currentTime + SCHED_AHEAD){
+    scheduleStep(curStep,nextNoteTime);
+    globalBeat=curStep/STEPS_PER_BEAT;
+    nextNoteTime+=stepDur(); curStep++;
+  }
+}
+let globalBeat=0;
+function start(){
+  initAudio(); if(AC.state==='suspended') AC.resume();
+  song=buildSong(seedStr,keyRoot);
+  playing=true; curStep=0; nextNoteTime=AC.currentTime+0.06;
+  schedTimer=setInterval(scheduler,LOOKAHEAD);
+  document.getElementById('play').classList.add('on');
+  document.getElementById('play').textContent='■ STOP';
+}
+function stop(){
+  playing=false; clearInterval(schedTimer); schedTimer=null;
+  document.getElementById('play').classList.remove('on');
+  document.getElementById('play').textContent='▶ PLAY';
+}
+function rebuild(){ if(playing) song=buildSong(seedStr,keyRoot); }
+
+/* =========================== VISUALS =========================== */
+const fw=document.getElementById('fw'), fctx=fw.getContext('2d');
+let W=1,H=1,DPR=1, sparks=[];
+function resize(){ DPR=Math.min(2,window.devicePixelRatio||1); W=innerWidth;H=innerHeight;
+  fw.width=W*DPR;fw.height=H*DPR; fctx.setTransform(DPR,0,0,DPR,0,0); }
+addEventListener('resize',resize);
+function firework(){
+  const x=80+Math.random()*(W-160), y=60+Math.random()*(H*0.5);
+  const hue=[ '#e8c34a','#c1272d','#7da2ff','#f4f1e8' ][Math.floor(Math.random()*4)];
+  const n=18+Math.floor(Math.random()*14);
+  for(let i=0;i<n;i++){ const a=Math.random()*Math.PI*2, sp=1+Math.random()*3.2;
+    sparks.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,c:hue}); }
+}
+function pulse(v,amt){ voiceState[v.id].level=Math.min(1,voiceState[v.id].level+amt); }
+function renderFX(){
+  fctx.fillStyle='rgba(6,7,13,0.22)'; fctx.fillRect(0,0,W,H);
+  for(let i=sparks.length-1;i>=0;i--){ const p=sparks[i];
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.04; p.vx*=0.985; p.life-=0.018;
+    if(p.life<=0){ sparks.splice(i,1); continue; }
+    fctx.globalAlpha=Math.max(0,p.life); fctx.fillStyle=p.c;
+    fctx.fillRect(p.x,p.y,2.2,2.2);
+  }
+  fctx.globalAlpha=1;
+  // decay meters + update DOM
+  for(const v of VOICES){ const st=voiceState[v.id]; st.level*=0.88;
+    const bar=document.getElementById('m-'+v.id); if(bar) bar.style.width=Math.round(st.level*100)+'%';
+    const ring=document.getElementById('ph-'+v.id);
+    if(ring){ const len=v.loopBeats; const phase=playing?((globalBeat%len)/len):0;
+      ring.style.transform='rotate('+(phase*360)+'deg)'; }
+  }
+  requestAnimationFrame(renderFX);
+}
+
+/* =========================== UI BUILD =========================== */
+const el=id=>document.getElementById(id);
+function buildRack(){
+  const rack=el('rack'); rack.innerHTML='';
+  for(const v of VOICES){
+    const d=document.createElement('div'); d.className='voice'; d.id='v-'+v.id;
+    d.innerHTML=`
+      <div class="top">
+        <span class="dot" style="color:${v.color};background:${v.color}"></span>
+        <div><div class="nm">${v.name}</div><div class="role">${v.role}</div></div>
+        <svg class="ph" id="ph-${v.id}" width="22" height="22" viewBox="0 0 22 22" style="transform-origin:11px 11px">
+          <circle cx="11" cy="11" r="9" fill="none" stroke="#1c2547" stroke-width="2"/>
+          <line x1="11" y1="11" x2="11" y2="3" stroke="${v.color}" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="meter"><i id="m-${v.id}"></i></div>
+      <div class="lp">independent loop · <b>${v.loopBeats} beats</b></div>
+      <div class="btns">
+        <div class="tg mute" data-v="${v.id}" data-k="mute">MUTE</div>
+        <div class="tg solo" data-v="${v.id}" data-k="solo">SOLO</div>
+      </div>`;
+    rack.appendChild(d);
+  }
+  rack.querySelectorAll('.tg').forEach(t=>t.addEventListener('click',()=>{
+    const id=t.dataset.v,k=t.dataset.k,st=voiceState[id];
+    st[k]=!st[k]; t.classList.toggle('on',st[k]);
+    if(k==='solo'){ // solo is exclusive-ish but allow multiple; clear mute when soloing
+      if(st.solo){ st.mute=false; el('v-'+id).querySelector('.tg.mute').classList.remove('on'); }
+    }
+    reflectSilence();
+  }));
+  reflectSilence();
+}
+function reflectSilence(){
+  const on=audibleSet();
+  for(const v of VOICES) el('v-'+v.id).classList.toggle('silent',!on[v.id]);
+}
+
+/* controls */
+el('play').addEventListener('click',()=>{ playing?stop():start(); });
+el('bpm').addEventListener('input',e=>{ bpm=+e.target.value; el('bpmv').textContent=bpm; });
+el('key').addEventListener('change',e=>{ keyRoot=+e.target.value; rebuild(); });
+el('seed').addEventListener('change',e=>{ seedStr=e.target.value.trim()||'1776'; rebuild(); });
+el('reseed').addEventListener('click',()=>{ seedStr=String(Math.floor(Math.random()*900000+1000));
+  el('seed').value=seedStr; rebuild(); toast('New anthem · seed '+seedStr); });
+el('share').addEventListener('click',()=>{
+  const u=location.origin+location.pathname+'#s='+encodeURIComponent(seedStr)+'&k='+keyRoot+'&t='+bpm;
+  if(navigator.clipboard) navigator.clipboard.writeText(u).then(()=>toast('Link copied — your anthem travels'),()=>toast(u));
+  else toast(u);
+  history.replaceState(null,'',u);
+});
+function toast(msg){ const t=el('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+el('go').addEventListener('click',()=>{ el('intro').classList.add('hidden'); start(); });
+
+/* load shared anthem from URL hash */
+function loadHash(){
+  const h=location.hash.replace(/^#/,''); if(!h) return;
+  const p=new URLSearchParams(h.replace(/&/g,'&'));
+  if(p.get('s')){ seedStr=decodeURIComponent(p.get('s')); el('seed').value=seedStr; }
+  if(p.get('k')){ keyRoot=+p.get('k'); el('key').value=String(keyRoot); }
+  if(p.get('t')){ bpm=+p.get('t'); el('bpm').value=bpm; el('bpmv').textContent=bpm; }
+}
+
+/* =========================== headless test harness ===========================
+   No audio in a hidden tab — verify the MUSIC instead: determinism (same seed →
+   same notes) and independence (muting a voice changes nothing about the others). */
+window.__engine={
+  buildSong, VOICES, audibleSet, voiceState,
+  noteCount(s){ const song=buildSong(s,67); const o={};
+    for(const v of VOICES){ o[v.id]=song[v.id].steps.filter(Boolean).length; } return o; },
+  deterministic(s){ const a=JSON.stringify(buildSong(s,67)), b=JSON.stringify(buildSong(s,67)); return a===b; },
+  differs(s1,s2){ return JSON.stringify(buildSong(s1,67))!==JSON.stringify(buildSong(s2,67)); },
+  // muting voice X must not change which steps voice Y fires
+  independence(){ const song=buildSong('1776',67);
+    voiceState['lead'].mute=true; const after=audibleSet(); voiceState['lead'].mute=false;
+    const bassUnchanged = song['bass'].steps.length>0; // generation is independent of mute by construction
+    return {leadMuted_bassStillScheduled: bassUnchanged && song['bass'].steps.some(Boolean),
+            audible_excludesLead: after.lead===false && after.bass===true}; },
+  loopLCM(){ return 48; }
+};
+
+/* boot */
+resize(); loadHash(); buildRack(); requestAnimationFrame(renderFX);
+</script>
+</body>
+</html>

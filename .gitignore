@@ -9,5 +9,9 @@ SUBMISSION.md
 # Local tooling / harness config — not part of the public deliverable
 .claude/
 
+# Private competitor watch — reference only, never published
+COMPETITORS.local.md
+**/*.local.md
+
 # OS / editor cruft
 .DS_Store
