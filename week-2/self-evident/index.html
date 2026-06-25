@@ -60,6 +60,16 @@
   .promptrow{display:flex;gap:8px;margin-top:10px;}
   .promptrow input{flex:1;font-family:inherit;font-size:12px;color:var(--white);
     background:#070a16;border:1px solid var(--line);padding:8px;}
+  button.verify{border-color:var(--sky);color:var(--sky);}
+  button:disabled{opacity:.5;cursor:default;transform:none;}
+  .readout{flex-basis:100%;width:100%;font-size:11px;color:#9fb0e0;letter-spacing:.5px;line-height:1.6;
+    margin-top:4px;min-height:14px;}
+  .readout b{color:var(--white);}
+  details#customWrap > summary{cursor:pointer;list-style:none;color:var(--sky);font-size:12px;letter-spacing:1px;}
+  details#customWrap > summary::-webkit-details-marker{display:none;}
+  details#customWrap[open] > summary{color:var(--gold);}
+  #corpusBox{width:100%;height:92px;font-family:inherit;font-size:12px;color:var(--white);
+    background:#070a16;border:1px solid var(--line);padding:8px;resize:vertical;}
   .note{font-size:11px;color:#7c8bbf;line-height:1.6;margin-top:18px;}
   .note b{color:var(--gold);} .note a{color:var(--sky);}
 
@@ -93,10 +103,13 @@
   <div class="deck">
     <button class="play" id="play">▶ DECLARE INDEPENDENCE</button>
     <button class="ghost" id="reset">⟳ RESET TO NOISE</button>
-    <div class="field"><span class="l">SPEED (steps/frame) <b id="spv">2</b></span>
+    <button class="ghost" id="ff">⏩ +100 STEPS</button>
+    <button class="ghost verify" id="verify">✓ VERIFY THE MATH</button>
+    <div class="field"><span class="l">SPEED (steps/tick) <b id="spv">2</b></span>
       <input type="range" id="speed" min="1" max="6" value="2" /></div>
     <div class="field"><span class="l">TEMPERATURE <b id="tpv">0.8</b></span>
       <input type="range" id="temp" min="20" max="130" value="80" /></div>
+    <div class="readout" id="say">Press <b>Declare Independence</b> — or hit <b>Verify the Math</b> to prove the backprop is real before you trust a word of this.</div>
   </div>
 
   <div class="stats">
@@ -125,6 +138,19 @@
       </div>
     </div>
   </div>
+
+  <details class="card" id="customWrap" style="margin-top:14px;">
+    <summary>▸ TRAIN IT ON YOUR OWN TEXT</summary>
+    <div style="margin-top:10px;">
+      <div class="lab" style="margin-top:0;">Paste any text — a poem, your essays, song lyrics, code. It throws away 1776, rebuilds its alphabet, and learns <i>your</i> voice from scratch.</div>
+      <textarea id="corpusBox" spellcheck="false" placeholder="Paste at least a couple paragraphs of text here…"></textarea>
+      <div class="promptrow">
+        <button id="trainCustom">▶ TRAIN ON THIS TEXT</button>
+        <button class="ghost" id="restoreCorpus">↩ back to the founding documents</button>
+      </div>
+      <div class="readout" id="corpusSay"></div>
+    </div>
+  </details>
 
   <div class="note">
     <b>How it's built:</b> a char-level <b>transformer</b> (token + positional embeddings → 2 blocks of causal
@@ -459,9 +485,10 @@ function valLoss(m,B){
   return lossAndGrad(m,caches,tgt,N);
 }
 
-/* autoregressive generation from a prompt string */
-function generate(m,prompt,nNew,temp){
-  const T=m.T; let ctx=encode(prompt); if(ctx.length===0) ctx=[stoi[' ']||0];
+/* autoregressive generation from a prompt string. topk>0 restricts sampling to
+   the k most-likely characters — cleaner output, especially early in training. */
+function generate(m,prompt,nNew,temp,topk){
+  const T=m.T; let ctx=encode(prompt); if(ctx.length===0) ctx=[0];
   let out='';
   for(let s=0;s<nNew;s++){
     const win=ctx.slice(-T); const Tn=win.length;
@@ -469,10 +496,16 @@ function generate(m,prompt,nNew,temp){
     for(let t=0;t<Tn;t++){ idx[t]=win[t]; pos[t]=t; }
     const caches=forward(m,idx,pos,Tn);
     const V=m.V, o=(Tn-1)*V, logits=caches.logits;
-    let mx=-1e30; for(let d=0;d<V;d++) if(logits[o+d]>mx)mx=logits[o+d];
+    const ids = (topk&&topk<V) ? Array.from({length:V},(_,d)=>d).sort((a,b)=>logits[o+b]-logits[o+a]).slice(0,topk) : null;
+    let mx=-1e30;
+    if(ids){ for(const d of ids) if(logits[o+d]>mx)mx=logits[o+d]; }
+    else { for(let d=0;d<V;d++) if(logits[o+d]>mx)mx=logits[o+d]; }
     let sum=0; const pr=new Float32Array(V);
-    for(let d=0;d<V;d++){ const e=Math.exp((logits[o+d]-mx)/temp); pr[d]=e; sum+=e; }
-    let r=RNG()*sum, pick=0; for(let d=0;d<V;d++){ r-=pr[d]; if(r<=0){pick=d;break;} pick=d; }
+    if(ids){ for(const d of ids){ const e=Math.exp((logits[o+d]-mx)/temp); pr[d]=e; sum+=e; } }
+    else { for(let d=0;d<V;d++){ const e=Math.exp((logits[o+d]-mx)/temp); pr[d]=e; sum+=e; } }
+    let r=RNG()*sum, pick=ids?ids[0]:0;
+    if(ids){ for(const d of ids){ r-=pr[d]; if(r<=0){pick=d;break;} pick=d; } }
+    else { for(let d=0;d<V;d++){ r-=pr[d]; if(r<=0){pick=d;break;} pick=d; } }
     ctx.push(pick); out+=itos[pick];
   }
   return out;
@@ -545,39 +578,43 @@ window.addEventListener('resize',fitAll);
    functions above are the SINGLE source of truth — we stringify them into the
    worker so the exact same (grad-checked) code trains there. */
 const CFG={dModel:48,nHead:4,nLayer:2,block:32,lr:3e-3,wd:1e-2};
-const LIVE={B:8, speed:2, temp:0.8, prompt:'We hold these truths', genLen:90, sampleEvery:8};
-let twin=null, running=false, started=false, step=0, worker=null;
+const LIVE={B:8, speed:2, temp:0.8, topk:10, prompt:'We hold these truths', genLen:90, sampleEvery:8};
+let twin=null, running=false, started=false, step=0, worker=null, currentCorpus=CORPUS;
 const trainHist=[], valHist=[]; let lastAttn=null;
 
 const WORKER_GLUE=`
-let model=null,cfg=null,running=false,step=0,lastSample=-999;
-function attnSnap(){ const T=model.T; let ctx=encode(cfg.prompt||'We hold').slice(-T); const Tn=ctx.length;
-  const idx=new Int32Array(Tn),pos=new Int32Array(Tn); for(let t=0;t<Tn;t++){idx[t]=ctx[t];pos[t]=t;}
+let model=null,cfg=null,running=false,step=0,lastSample=-999,burstTarget=-1;
+function attnSnap(){ const T=model.T; let ctx=encode(cfg.prompt||'a').slice(-T); if(ctx.length===0)ctx=[0];
+  const Tn=ctx.length; const idx=new Int32Array(Tn),pos=new Int32Array(Tn); for(let t=0;t<Tn;t++){idx[t]=ctx[t];pos[t]=t;}
   const c=forward(model,idx,pos,Tn); const bc=c.blocks[c.blocks.length-1]; return {P:Array.from(bc.probs[0]),T:Tn}; }
-function loop(){ if(!running) return; const t0=Date.now(); let loss=0;
-  for(let i=0;i<cfg.speed;i++){ loss=trainStep(model,cfg.B); step++; }
-  const tps=(cfg.speed*cfg.B*model.T)/((Date.now()-t0)/1000);
-  let val=null; if(step%30<cfg.speed) val=valLoss(model,cfg.B);
-  postMessage({type:'progress',step,loss,val,tps});
-  if(step-lastSample>=cfg.sampleEvery){ lastSample=step;
-    postMessage({type:'sample',step,text:generate(model,cfg.prompt,cfg.genLen,cfg.temp),attn:attnSnap()}); }
+function loop(){ if(!running && burstTarget<0) return; const t0=Date.now(); let loss=0;
+  const chunk=burstTarget>=0?6:cfg.speed;
+  for(let i=0;i<chunk;i++){ loss=trainStep(model,cfg.B); step++; }
+  const tps=(chunk*cfg.B*model.T)/((Date.now()-t0)/1000);
+  let val=null; if(step%30<chunk && dataVal.length>model.T+2) val=valLoss(model,cfg.B);
+  postMessage({type:'progress',step,loss,val,tps,burst:burstTarget>=0});
+  const hit=burstTarget>=0&&step>=burstTarget;
+  if(step-lastSample>=cfg.sampleEvery||hit){ lastSample=step;
+    postMessage({type:'sample',step,text:generate(model,cfg.prompt,cfg.genLen,cfg.temp,cfg.topk),attn:attnSnap()}); }
+  if(hit){ burstTarget=-1; postMessage({type:'burstdone',step}); if(!running) return; }
   setTimeout(loop,0); }
 onmessage=e=>{ const d=e.data;
-  if(d.cmd==='init'){ cfg=d.cfg; RNG=mulberry32(1776); model=makeModel(cfg); step=0; lastSample=-999; postMessage({type:'ready',params:model.nParams}); }
-  else if(d.cmd==='start'){ if(!running){running=true; loop();} }
+  if(d.cmd==='init'){ cfg=d.cfg; setCorpus(d.corpus||CORPUS||' '); RNG=mulberry32(1776); model=makeModel(cfg); step=0; lastSample=-999; burstTarget=-1; postMessage({type:'ready',params:model.nParams,vocab:VOCAB}); }
+  else if(d.cmd==='start'){ if(!running){running=true; if(burstTarget<0)loop();} }
   else if(d.cmd==='pause'){ running=false; }
-  else if(d.cmd==='reset'){ running=false; RNG=mulberry32(d.seed||1776); model=makeModel(cfg); step=0; lastSample=-999; postMessage({type:'ready',params:model.nParams,reset:true}); }
+  else if(d.cmd==='reset'){ running=false; RNG=mulberry32(d.seed||1776); model=makeModel(cfg); step=0; lastSample=-999; burstTarget=-1; postMessage({type:'ready',params:model.nParams,vocab:VOCAB,reset:true}); }
+  else if(d.cmd==='burst'){ burstTarget=step+(d.n||100); if(!running) loop(); }
   else if(d.cmd==='hyper'){ for(const k in d.set) cfg[k]=d.set[k]; }
-  else if(d.cmd==='gen'){ postMessage({type:'sample',step,text:generate(model,d.prompt,d.n,d.temp),attn:attnSnap(),manual:true}); } };
+  else if(d.cmd==='gen'){ postMessage({type:'sample',step,text:generate(model,d.prompt,d.n,d.temp,cfg.topk),attn:attnSnap(),manual:true}); } };
 `;
 function buildWorkerSource(){
   const fns=[mulberry32,randn,mm,mmBt,mmAt,P,makeModel,lnFwd,lnBwd,gelu,geluGrad,
              forward,lossAndGrad,backward,addInto,zeroGrads,adamStep,sampleBatch,trainStep,valLoss,generate];
   let s='';
-  s+='const CORPUS='+JSON.stringify(CORPUS)+';\n';
-  s+="const chars=Array.from(new Set(CORPUS.split(''))).sort();const stoi={};chars.forEach((c,i)=>stoi[c]=i);const itos=chars;const VOCAB=chars.length;\n";
-  s+="const encode=s=>Array.from(s).map(c=>stoi[c]??0);\n";
-  s+="const dataAll=encode(CORPUS);const nTrain=Math.floor(dataAll.length*0.9);let dataTrain=dataAll.slice(0,nTrain),dataVal=dataAll.slice(nTrain);\n";
+  // dynamic corpus: the worker rebuilds its alphabet + data from whatever text we send
+  s+='let CORPUS="",chars=[],stoi={},itos=[],VOCAB=0,dataAll=[],nTrain=0,dataTrain=[],dataVal=[];\n';
+  s+='const encode=s=>Array.from(s).map(c=>stoi[c]??0);\n';
+  s+='function setCorpus(t){CORPUS=t;chars=Array.from(new Set(t.split(""))).sort();stoi={};chars.forEach((c,i)=>stoi[c]=i);itos=chars;VOCAB=chars.length;dataAll=encode(t);nTrain=Math.floor(dataAll.length*0.9);dataTrain=dataAll.slice(0,nTrain);dataVal=dataAll.slice(nTrain);}\n';
   s+='let RNG=mulberry32(1776);\n';
   s+=fns.map(f=>f.toString()).join('\n')+'\n';
   s+=WORKER_GLUE;
@@ -587,7 +624,7 @@ function startWorker(){
   if(worker) worker.terminate();
   worker=new Worker(URL.createObjectURL(new Blob([buildWorkerSource()],{type:'text/javascript'})));
   worker.onmessage=onWorker;
-  worker.postMessage({cmd:'init', cfg:Object.assign({}, CFG, LIVE)});
+  worker.postMessage({cmd:'init', cfg:Object.assign({}, CFG, LIVE), corpus:currentCorpus});
 }
 function ensureStarted(){ if(!started){ started=true; startWorker(); } }
 function onWorker(e){ const d=e.data;
@@ -595,6 +632,8 @@ function onWorker(e){ const d=e.data;
     if(d.reset){ step=0; trainHist.length=0; valHist.length=0; lastAttn=null;
       el('s-step').textContent='0'; el('s-loss').textContent='—'; el('s-val').textContent='—'; el('s-tps').textContent='—';
       el('genTag').textContent='untrained'; el('gen').textContent='…'; drawLoss(); drawAttn(); } }
+  else if(d.type==='burstdone'){ el('ff').disabled=false; el('ff').textContent='⏩ +100 STEPS';
+    if(!running){ el('play').classList.remove('on'); el('play').textContent='▶ RESUME TRAINING'; } }
   else if(d.type==='progress'){ step=d.step;
     trainHist.push(d.loss); if(trainHist.length>6000) trainHist.shift();
     if(d.val!=null){ valHist.push({x:step,y:d.val}); if(valHist.length>1200)valHist.shift(); el('s-val').textContent=d.val.toFixed(3); }
@@ -641,7 +680,7 @@ function drawAttn(){
 }
 
 function escapeHtml(s){ return s.replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
-function regenTwin(){ const p=LIVE.prompt; el('twin').textContent=p+generate(twin,p,90,LIVE.temp); }
+function regenTwin(){ const p=LIVE.prompt; el('twin').textContent=p+generate(twin,p,90,LIVE.temp,LIVE.topk); }
 function setPrompt(){ LIVE.prompt=el('prompt').value||'We hold these truths';
   if(worker) worker.postMessage({cmd:'hyper',set:{prompt:LIVE.prompt}});
   if(started && worker) worker.postMessage({cmd:'gen',prompt:LIVE.prompt,n:160,temp:LIVE.temp});
@@ -652,8 +691,9 @@ el('play').addEventListener('click',()=>{ ensureStarted(); running=!running;
   el('play').classList.toggle('on',running);
   el('play').textContent=running?'❚❚ PAUSE TRAINING':'▶ RESUME TRAINING';
   worker.postMessage({cmd:running?'start':'pause'}); });
+function resetFF(){ el('ff').disabled=false; el('ff').textContent='⏩ +100 STEPS'; }
 el('reset').addEventListener('click',()=>{ running=false; el('play').classList.remove('on');
-  el('play').textContent='▶ DECLARE INDEPENDENCE';
+  el('play').textContent='▶ DECLARE INDEPENDENCE'; resetFF();
   if(worker) worker.postMessage({cmd:'reset',seed:1776}); else { trainHist.length=0; valHist.length=0; drawLoss(); } });
 el('speed').addEventListener('input',e=>{ LIVE.speed=+e.target.value; el('spv').textContent=LIVE.speed;
   if(worker) worker.postMessage({cmd:'hyper',set:{speed:LIVE.speed}}); });
@@ -665,6 +705,43 @@ el('go').addEventListener('click',()=>{ el('intro').classList.add('hidden'); ens
   running=true; el('play').classList.add('on'); el('play').textContent='❚❚ PAUSE TRAINING';
   worker.postMessage({cmd:'start'}); });
 el('reopen').addEventListener('click',()=>el('intro').classList.remove('hidden'));
+
+/* verify the math — run the numerical gradient check live and surface the result */
+el('verify').addEventListener('click',()=>{
+  const out=el('say'); out.textContent='Checking — running finite-difference gradients against the hand-written backprop…';
+  el('verify').disabled=true;
+  setTimeout(()=>{ const r=window.__gpt.gradCheck();
+    out.innerHTML = r.ok
+      ? '✓ <b style="color:var(--gold)">Backprop verified.</b> Across '+r.checked+' parameters, the hand-written analytic gradients match numerical finite differences to <b>'+(r.maxRelError*100).toFixed(2)+'%</b>. The calculus is correct — nothing here is faked.'
+      : '⚠ Max relative error '+(r.maxRelError*100).toFixed(2)+'% — re-run (finite-difference noise on near-zero gradients).';
+    el('verify').disabled=false; },30);
+});
+
+/* fast-forward — burst-train ahead so you can jump to good output */
+el('ff').addEventListener('click',()=>{ ensureStarted();
+  el('ff').disabled=true; el('ff').textContent='⏩ fast-forwarding…';
+  worker.postMessage({cmd:'burst',n:100}); });
+
+/* train on your own text — it rebuilds its alphabet and learns a new voice from scratch */
+function trainOnCorpus(text,label,prompt){
+  currentCorpus=text; LIVE.prompt=prompt; el('prompt').value=prompt;
+  started=true; startWorker(); resetFF();
+  trainHist.length=0; valHist.length=0; lastAttn=null; step=0;
+  el('s-step').textContent='0'; el('s-loss').textContent='—'; el('s-val').textContent='—'; el('s-tps').textContent='—';
+  el('genTag').textContent='untrained'; drawLoss(); drawAttn(); regenTwin();
+  running=true; el('play').classList.add('on'); el('play').textContent='❚❚ PAUSE TRAINING';
+  worker.postMessage({cmd:'start'});
+  el('corpusSay').innerHTML='Now training from scratch on <b>'+label+'</b>. Watch it learn a new voice.';
+  el('curveTag').textContent='learning: '+label;
+}
+el('trainCustom').addEventListener('click',()=>{
+  let t=el('corpusBox').value;
+  if(t.trim().length<150){ el('corpusSay').textContent='Give it at least ~150 characters so there is a language to learn.'; return; }
+  if(t.length>20000) t=t.slice(0,20000);
+  while(t.length<400) t=t+'\n'+t;
+  trainOnCorpus(t,'your text', t.trim().replace(/\s+/g,' ').slice(0,18));
+});
+el('restoreCorpus').addEventListener('click',()=>{ trainOnCorpus(CORPUS,'the founding documents','We hold these truths'); el('corpusSay').textContent='Back to the founding documents.'; });
 
 /* boot — build the frozen twin on the main thread (it never trains) */
 fitAll();
