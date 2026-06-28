@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>EMERGENT REVOLUTION — independence is learned, not declared</title>
+<style>
+  :root{
+    --red:#c1272d; --white:#f4f1e8; --blue:#3b56b0; --sky:#7da2ff;
+    --gold:#e8c34a; --ink:#06070d; --panel:#0b0f22; --line:#1c2547;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    background:var(--ink); color:var(--white);
+    font-family:"Courier New",monospace; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stage{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+
+  /* ---- top HUD ---- */
+  #hud{
+    position:fixed;top:0;left:0;right:0;z-index:5;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 14px;background:linear-gradient(#06070dee,#06070d88 70%,#06070d00);
+    pointer-events:none;
+  }
+  #hud .brand{font-size:15px;letter-spacing:3px;color:var(--gold);
+    text-shadow:2px 2px 0 var(--red);white-space:nowrap;}
+  #hud .brand small{display:block;font-size:9px;letter-spacing:1px;color:#9fb0e0;
+    text-shadow:none;margin-top:2px;}
+  .gauge{flex:1;min-width:180px;max-width:420px;}
+  .gauge .lab{display:flex;justify-content:space-between;font-size:10px;
+    letter-spacing:1px;color:#9fb0e0;margin-bottom:3px;}
+  .gauge .lab b{color:var(--white);}
+  .bar{height:14px;border:1px solid var(--line);background:#070a16;position:relative;overflow:hidden;}
+  .bar>i{position:absolute;inset:0;width:0%;
+    background:linear-gradient(90deg,#7a1d20,var(--red));transition:width .14s linear;}
+  #spark{display:block;width:100%;height:34px;border:1px solid var(--line);background:#070a16;}
+  .modepill{font-size:10px;letter-spacing:1px;padding:4px 8px;border:1px solid var(--line);
+    white-space:nowrap;color:var(--ink);background:var(--sky);font-weight:bold;}
+  .modepill.contested{background:var(--gold);}
+  .modepill.revolt{background:var(--red);color:var(--white);}
+
+  /* ---- bottom control deck ---- */
+  #deck{
+    position:fixed;left:0;right:0;bottom:0;z-index:5;
+    display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;justify-content:center;
+    padding:10px 14px 12px;
+    background:linear-gradient(#06070d00,#06070dcc 36%,#06070d);
+  }
+  .ctl{display:flex;flex-direction:column;gap:5px;}
+  .ctl .t{font-size:10px;letter-spacing:1px;color:#9fb0e0;text-align:center;}
+  .ctl .t b{color:var(--gold);}
+  .sl{width:min(40vw,168px);}
+  input[type=range]{-webkit-appearance:none;width:100%;height:20px;background:transparent;cursor:pointer;}
+  input[type=range]::-webkit-slider-runnable-track{height:6px;border:1px solid var(--line);
+    background:linear-gradient(90deg,#243056,var(--gold));}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:22px;margin-top:-9px;
+    background:var(--white);border:2px solid var(--ink);}
+  input[type=range]::-moz-range-track{height:6px;border:1px solid var(--line);
+    background:linear-gradient(90deg,#243056,var(--gold));}
+  input[type=range]::-moz-range-thumb{width:13px;height:22px;background:var(--white);border:2px solid var(--ink);border-radius:0;}
+  button{
+    font-family:inherit;font-size:12px;letter-spacing:1px;color:var(--white);
+    background:var(--panel);border:2px solid var(--gold);padding:9px 12px;cursor:pointer;
+    transition:transform .07s,background .15s;white-space:nowrap;
+  }
+  button:hover{background:#11183a;transform:translateY(-2px);}
+  button:active{transform:translateY(0);}
+  button.danger{border-color:var(--red);color:#ffd9d0;}
+  button.danger:hover{background:#2a0f10;}
+  button.ghost{border-color:var(--line);color:#9fb0e0;font-size:11px;padding:8px 10px;}
+  button.on{background:var(--red);border-color:var(--red);color:var(--white);}
+  .readout{font-size:11px;color:#9fb0e0;letter-spacing:.5px;min-height:14px;text-align:center;width:100%;line-height:1.5;}
+  .readout b{color:var(--gold);} .readout .r{color:#ff8e8e;} .readout .l{color:var(--sky);}
+
+  /* ---- intro overlay ---- */
+  #intro{
+    position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:#06070dee;backdrop-filter:blur(2px);overflow:auto;
+  }
+  #intro .card{max-width:580px;border:3px solid var(--gold);background:var(--panel);
+    padding:24px;box-shadow:0 0 0 4px #06070d,0 12px 40px #000;}
+  #intro h1{font-size:clamp(19px,5vw,29px);letter-spacing:3px;color:var(--gold);
+    text-shadow:3px 3px 0 var(--red);margin-bottom:6px;}
+  #intro .tag{font-size:12px;color:var(--sky);letter-spacing:1px;margin-bottom:16px;}
+  #intro p{font-size:13px;line-height:1.65;color:#d7dcef;margin-bottom:12px;}
+  #intro p b{color:var(--white);} #intro .crownword{color:var(--gold);} #intro .freeword{color:#ff8e8e;}
+  #intro .start{margin-top:8px;width:100%;font-size:14px;padding:13px;border-color:var(--sky);}
+  .iBtn{position:fixed;right:12px;top:12px;z-index:6;width:30px;height:30px;padding:0;
+    border-radius:50%;border:2px solid var(--line);color:#9fb0e0;background:var(--panel);font-size:13px;}
+  .hidden{display:none!important;}
+  @media(max-width:600px){
+    #hud .brand small{display:none;}
+    #deck{gap:9px;padding:9px;}
+    button{font-size:11px;padding:8px 9px;}
+    .sl{width:38vw;}
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+
+<div id="hud">
+  <div class="brand">★ EMERGENT REVOLUTION<small>independence is learned, not declared</small></div>
+  <div class="gauge">
+    <div class="lab"><span>COLONIES INDEPENDENT <span id="rnd" style="opacity:.6"></span></span><b id="cnt">0 / 13</b></div>
+    <div class="bar" id="cntbar"><i></i></div>
+    <canvas id="spark"></canvas>
+  </div>
+  <div class="modepill" id="mode">LOYALIST EQUILIBRIUM</div>
+</div>
+
+<button class="iBtn" id="reopen" title="How it works">ⓘ</button>
+
+<div id="deck">
+  <div class="ctl sl">
+    <div class="t">CROWN <b>TAX</b></div>
+    <input type="range" id="tax" min="0" max="100" value="78" />
+  </div>
+  <div class="ctl sl">
+    <div class="t">CROWN <b>RETALIATION</b></div>
+    <input type="range" id="retal" min="0" max="100" value="50" />
+  </div>
+  <div class="ctl sl">
+    <div class="t">INTER-COLONY <b>TRADE</b></div>
+    <input type="range" id="trade" min="0" max="100" value="55" />
+  </div>
+  <div class="ctl">
+    <div class="t">&nbsp;</div>
+    <button id="play" class="on">⏸ PAUSE</button>
+  </div>
+  <div class="ctl">
+    <div class="t">freeze learning</div>
+    <button id="freeze" class="ghost">🔒 NO LEARNING</button>
+  </div>
+  <div class="ctl">
+    <div class="t">&nbsp;</div>
+    <button class="ghost" id="reset">↺ NEW CONGRESS</button>
+  </div>
+  <div class="readout" id="say">Each colony is a reinforcement-learning agent starting from <b>zero</b> knowledge. Nobody told it to revolt. Watch what it learns.</div>
+</div>
+
+<div id="intro">
+  <div class="card">
+    <h1>EMERGENT REVOLUTION</h1>
+    <div class="tag">WEEK 2 · INDEPENDENCE ENGINES · independence is not a symbol, it's a <i>mechanic</i></div>
+    <p>Thirteen colonies. Each one is a <b>reinforcement-learning agent</b> — a from-scratch Q-learner, no libraries, no LLM, no cloud — that starts knowing <b>nothing</b>. Every round each colony picks one move: <span class="crownword">stay loyal</span> and pay the Crown's tax, or <span class="freeword">revolt</span>.</p>
+    <p>Revolt <b>alone</b> and the Crown crushes you. Revolt <b>together</b> and you trade as free states and the Crown can't hold the line. No colony is told this. They <b>discover it</b> — each one learning, from its own payoffs, whether independence pays.</p>
+    <p>So independence here isn't scripted and it isn't declared. It's an <b>equilibrium that has to be learned</b>. Slide <b>Tax</b>, <b>Retaliation</b>, and <b>Trade</b> and watch the learned outcome flip — a loyalist seaboard, or a revolution that cascades colony to colony.</p>
+    <p style="color:#9fb0e0;font-size:12px;">Others staged the vote or had an LLM debate it. Here the colonies <b>teach themselves</b> to be free. Hit <b>🔒 No-Learning</b> any time — freeze the brains and the revolution never comes. That's the proof it was learned, not faked.</p>
+    <button class="start" id="go">CONVENE THE CONGRESS ▶</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==================================================================
+   EMERGENT REVOLUTION
+   13 colonies = 13 independent tabular Q-learning agents playing a
+   repeated coordination game (a stag hunt) against the Crown.
+   - Action: STAY (loyal, taxed) or REVOLT.
+   - Revolt alone -> crushed; revolt with neighbours -> trade + freedom.
+   - The Crown's ability to crush DECAYS as the revolt spreads, so a
+     critical mass tips into a self-reinforcing cascade.
+   Each agent learns its own policy from reward only. Independence is an
+   EMERGENT learned equilibrium, never scripted.
+
+   All learning lives in pure functions over flat arrays so it can run
+   HEADLESSLY (the preview tab pauses rAF). See window.__sim.
+   ================================================================== */
+
+/* ---------- seeded RNG (mulberry32) so runs are reproducible/shareable ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let seed=(parseInt((location.hash||'').replace('#',''),36)||0)>>>0;
+if(!seed){ seed=(Math.floor((Date.now()%1e9))*2654435761>>>0)||12345; }
+let rng=mulberry32(seed);
+function setSeed(s){ seed=s>>>0; rng=mulberry32(seed); try{history.replaceState(null,'','#'+seed.toString(36));}catch(e){} }
+
+/* ---------- the colonies (north -> south along the seaboard) ---------- */
+const COLS=[
+  ["NH","New Hampshire"],["MA","Massachusetts"],["RI","Rhode Island"],["CT","Connecticut"],
+  ["NY","New York"],["NJ","New Jersey"],["PA","Pennsylvania"],["DE","Delaware"],
+  ["MD","Maryland"],["VA","Virginia"],["NC","N. Carolina"],["SC","S. Carolina"],["GA","Georgia"]
+];
+const N=COLS.length;
+
+/* adjacency: the seaboard chain + the real 1773 Committees of Correspondence
+   long-range links (MA<->VA, NY<->SC, PA<->GA) that coordinated the colonies. */
+const EDGES=[];
+for(let i=0;i<N-1;i++) EDGES.push([i,i+1]);
+EDGES.push([1,9],[4,11],[6,12]);            // committees of correspondence
+const NB=Array.from({length:N},()=>[]);
+for(const [a,b] of EDGES){ NB[a].push(b); NB[b].push(a); }
+
+/* ---------- learning hyper-params ---------- */
+const A=2;                 // actions: 0=STAY, 1=REVOLT
+const SBUCK=4;             // state = bucket of "fraction of my neighbours who revolted last round"
+const GAMMA=0.9, LR=0.18;
+const EPS0=0.35, EPSMIN=0.02, EPS_HALF=320; // exploration anneal (rounds)
+
+/* ---------- game parameters (driven by the sliders, 0..1) ---------- */
+let TAX=0.78, RETAL=0.50, TRADE=0.55;
+let learning=true;         // freeze toggle
+
+/* ---------- agent state ---------- */
+let Q;                     // Q[i] = Float32Array(SBUCK*A)
+let lastLocal;            // Float32Array(N): each colony's neighbour-revolt fraction last round
+let lastAct;             // Int8Array(N): last action taken
+let rebelEMA;           // Float32Array(N): smoothed "how rebel is this colony" for display
+let confEMA;            // Float32Array(N): smoothed policy confidence for display
+let round=0;
+let rebelFrac=0;         // global fraction in open revolt (this round)
+const hist=[];            // rebelFrac per round, for the sparkline
+
+function bucket(frac){ let b=Math.floor(frac*SBUCK); if(b<0)b=0; if(b>=SBUCK)b=SBUCK-1; return b; }
+function epsilon(){ return EPSMIN+(EPS0-EPSMIN)*Math.pow(0.5, round/EPS_HALF); }
+
+function reset(keepSliders){
+  Q=Array.from({length:N},()=>new Float32Array(SBUCK*A)); // tabula rasa — zero knowledge
+  lastLocal=new Float32Array(N);
+  lastAct=new Int8Array(N);
+  rebelEMA=new Float32Array(N);
+  confEMA=new Float32Array(N);
+  round=0; rebelFrac=0; hist.length=0;
+  if(!keepSliders){/* sliders unchanged */}
+}
+
+/* ---------- one round of the repeated game + Q-update (pure logic) ---------- */
+function stepRound(){
+  const eps=epsilon();
+  const act=new Int8Array(N);
+  const st=new Int8Array(N);
+  // 1. each colony picks an action from its own policy (epsilon-greedy)
+  for(let i=0;i<N;i++){
+    const s=bucket(lastLocal[i]); st[i]=s;
+    const q=Q[i]; const qStay=q[s*A+0], qRev=q[s*A+1];
+    let a;
+    if(rng()<eps) a=rng()<0.5?0:1;            // explore
+    else a=(qRev>qStay)?1:(qRev<qStay?0:(rng()<0.5?0:1)); // exploit (ties random)
+    act[i]=a;
+  }
+  // 2. resolve payoffs from the JOINT action profile
+  let nRev=0; for(let i=0;i<N;i++) if(act[i]) nRev++;
+  const globalRebel=nRev/N;
+  const reward=new Float32Array(N);
+  const localFrac=new Float32Array(N);
+  for(let i=0;i<N;i++){
+    const nb=NB[i]; let rn=0; for(const j of nb) if(act[j]) rn++;
+    const lf=nb.length?rn/nb.length:0; localFrac[i]=lf;
+    if(act[i]===0){
+      // STAY: a quiet living minus the Crown's tax. Safe, and good while tax is low.
+      reward[i]=1.0 - 1.6*TAX;
+    } else {
+      // REVOLT: independence has an UP-FRONT cost (lost Crown protection, war), then pays
+      // off only through trade among fellow free states. Revolt while your neighbours stay
+      // loyal and the Crown crushes you. Its reach weakens as the revolt spreads.
+      const effR=RETAL*(1-globalRebel);
+      reward[i]=-0.2 + 2.2*TRADE*lf - 2.6*effR*(1-lf);
+    }
+  }
+  // 3. Q-learning update toward reward + discounted best next value
+  if(learning){
+    for(let i=0;i<N;i++){
+      const s=st[i], a=act[i], q=Q[i];
+      const sN=bucket(localFrac[i]);          // next state = what I observed this round
+      const maxN=Math.max(q[sN*A+0], q[sN*A+1]);
+      const idx=s*A+a;
+      q[idx]+= LR*(reward[i] + GAMMA*maxN - q[idx]);
+    }
+  }
+  // 4. roll state forward + bookkeeping for display
+  for(let i=0;i<N;i++){
+    lastLocal[i]=localFrac[i]; lastAct[i]=act[i];
+    rebelEMA[i]=rebelEMA[i]*0.9 + act[i]*0.1;
+    const s=bucket(lastLocal[i]); const conf=Math.abs(Q[i][s*A+1]-Q[i][s*A+0]);
+    confEMA[i]=confEMA[i]*0.9 + Math.min(1,conf/2)*0.1;
+  }
+  rebelFrac=globalRebel;
+  round++;
+  hist.push(rebelFrac); if(hist.length>240) hist.shift();
+  return {round,rebelFrac,nRev,eps};
+}
+
+/* committed = colony's GREEDY policy IN THE WORLD IT ACTUALLY FACES is to revolt.
+   This is the realized learned equilibrium (not the exploration noise, and not a
+   counterfactual) — under a loyalist seaboard it reads 0, under revolution it reads 13. */
+function committedCount(){
+  let n=0;
+  for(let i=0;i<N;i++){ const q=Q[i]; const s=bucket(lastLocal[i]); if(q[s*A+1]>q[s*A+0]) n++; }
+  return n;
+}
+
+/* ============================ rendering ============================ */
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const spark=document.getElementById('spark'), sctx=spark.getContext('2d');
+let W=1,H=1,DPR=1,pos=[];
+function resize(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=W*DPR; canvas.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  const sw=spark.clientWidth||300, sh=34;
+  spark.width=sw*DPR; spark.height=sh*DPR; sctx.setTransform(DPR,0,0,DPR,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+
+let hudH=100, deckH=150;   // measured each layout so the column never collides with the chrome
+function layout(){
+  pos=[];
+  const hud=document.getElementById('hud'), deck=document.getElementById('deck');
+  hudH=hud?hud.getBoundingClientRect().height:100;
+  deckH=deck?deck.getBoundingClientRect().height:150;
+  const top=hudH+70, bot=H-deckH-22;       // NH clears the Crown; GA clears the deck
+  const span=Math.max(120,bot-top);
+  const cx=W*0.5, amp=Math.min(W*0.20,150);
+  for(let i=0;i<N;i++){
+    const t=i/(N-1);
+    // a coastline wiggle so the column reads as a seaboard, not a list
+    const x=cx + Math.sin(t*Math.PI*2.3)*amp + (((i*53)%7)-3)*4;
+    const y=top + t*span;
+    pos.push({x,y});
+  }
+}
+const crown=()=>({x:W*0.5, y:hudH+30});
+
+function lerpCol(a,b,t){return a.map((v,i)=>Math.round(v+(b[i]-v)*t));}
+const LOYAL=[59,86,176], REBEL=[193,39,45], GOLD=[232,195,74];
+
+function draw(){
+  ctx.fillStyle="#06070d"; ctx.fillRect(0,0,W,H);
+  const cr=crown();
+  const crownAlive=Math.max(0,1-rebelFrac*1.15);   // the Crown fades as the revolt spreads
+
+  // tax rays Crown -> still-loyal colonies (gold), thin
+  for(let i=0;i<N;i++){
+    if(rebelEMA[i]>0.5) continue;
+    const p=pos[i];
+    ctx.strokeStyle=`rgba(232,195,74,${0.05+0.12*crownAlive})`; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(cr.x,cr.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+  }
+  // edges between colonies; glow red when both sides are in revolt (a free-trade bond)
+  for(const [a,b] of EDGES){
+    const pa=pos[a], pb=pos[b];
+    const both=Math.min(rebelEMA[a],rebelEMA[b]);
+    const committee = (Math.abs(a-b)>1);
+    if(both>0.35){
+      ctx.strokeStyle=`rgba(255,120,90,${0.25+0.6*both})`; ctx.lineWidth=committee?3:2.4;
+    } else {
+      ctx.strokeStyle=committee?"rgba(232,195,74,0.18)":"rgba(40,52,90,0.9)"; ctx.lineWidth=committee?1.6:1.4;
+    }
+    ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y); ctx.stroke();
+  }
+
+  // the Crown node
+  ctx.globalAlpha=0.35+0.65*crownAlive;
+  ctx.fillStyle="#e8c34a"; ctx.strokeStyle="#06070d"; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(cr.x,cr.y,15,0,7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#06070d"; ctx.font="bold 11px 'Courier New'"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText("♔",cr.x,cr.y+1);
+  ctx.globalAlpha=1;
+  ctx.fillStyle="#9fb0e0"; ctx.font="9px 'Courier New'";
+  ctx.fillText(crownAlive>0.5?"THE CROWN":"CROWN WEAKENING", cr.x, cr.y-22);
+
+  // colony nodes
+  for(let i=0;i<N;i++){
+    const p=pos[i], reb=rebelEMA[i], conf=confEMA[i];
+    const col=lerpCol(LOYAL,REBEL,reb);
+    const r=11+conf*5 + (lastAct[i]?1.5:0);
+    // conviction halo
+    if(conf>0.25){
+      ctx.strokeStyle=`rgba(${col[0]},${col[1]},${col[2]},${0.25+0.4*conf})`; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+5,0,7); ctx.stroke();
+    }
+    ctx.fillStyle=`rgb(${col[0]},${col[1]},${col[2]})`;
+    ctx.strokeStyle= reb>0.5?"#ffd9d0":"#0b0f22"; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill(); ctx.stroke();
+    // abbrev
+    ctx.fillStyle = reb>0.45?"#fff":"#dfe6ff";
+    ctx.font="bold 10px 'Courier New'"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(COLS[i][0],p.x,p.y);
+    // a tiny star pops on a colony that just acted in open revolt
+    if(lastAct[i]){
+      ctx.fillStyle="#ffe9a0"; ctx.font="9px 'Courier New'";
+      ctx.fillText("★",p.x+r+6,p.y-r+2);
+    }
+  }
+}
+
+function drawSpark(){
+  const w=spark.clientWidth||300,h=34;
+  sctx.clearRect(0,0,w,h);
+  sctx.strokeStyle="#1c2547"; sctx.lineWidth=1;
+  sctx.beginPath(); sctx.moveTo(0,h*0.5); sctx.lineTo(w,h*0.5); sctx.stroke();
+  if(hist.length<2) return;
+  sctx.beginPath();
+  for(let i=0;i<hist.length;i++){
+    const x=i/(hist.length-1)*w, y=h-2-hist[i]*(h-4);
+    i?sctx.lineTo(x,y):sctx.moveTo(x,y);
+  }
+  sctx.strokeStyle=rebelFrac>0.5?"#c1272d":"#7da2ff"; sctx.lineWidth=2; sctx.stroke();
+}
+
+/* ============================ HUD ============================ */
+const el=id=>document.getElementById(id);
+const cntEl=el('cnt'), cntbarI=el('cntbar').querySelector('i'),
+      modeEl=el('mode'), rndEl=el('rnd'), sayEl=el('say');
+
+function modeInfo(f){
+  if(f<0.18) return ['LOYALIST EQUILIBRIUM',''];
+  if(f<0.62) return ['CONTESTED','contested'];
+  return ['REVOLUTION','revolt'];
+}
+function updateHUD(){
+  // headline = realized learned policy (stable); sparkline tracks live action dynamics
+  const committed=committedCount();
+  const cf=committed/N;
+  cntEl.textContent=`${committed} / ${N}`;
+  cntbarI.style.width=Math.round(cf*100)+'%';
+  const [lab,cls]=modeInfo(cf);
+  modeEl.textContent=lab;
+  modeEl.className='modepill'+(cls?' '+cls:'');
+  rndEl.textContent=`· round ${round} · ${Math.round(rebelFrac*100)}% in open revolt`;
+}
+
+/* ---------- sliders ---------- */
+function pct(v){return Math.round(v*100);}
+function sliders(){
+  TAX=(+el('tax').value)/100; RETAL=(+el('retal').value)/100; TRADE=(+el('trade').value)/100;
+}
+['tax','retal','trade'].forEach(id=>el(id).addEventListener('input',()=>{ sliders(); narrate(); }));
+
+function narrate(){
+  // describe the incentive landscape the colonies are facing right now
+  const loyal=(1.0-1.6*TAX).toFixed(2);
+  const together=(-0.2+2.2*TRADE).toFixed(2);     // revolt with the whole seaboard free
+  let msg;
+  if(+together > +loyal+0.15)
+    msg=`Free-trade independence pays <b>${together}</b> vs <b>${loyal}</b> for staying taxed — so if the colonies can <span class="r">coordinate</span>, revolution is the better equilibrium. Watch them find it.`;
+  else
+    msg=`Loyalty still pays <b>${loyal}</b>; a free union would only pay <b>${together}</b>. Independence isn't worth the war yet — expect a <span class="l">loyalist seaboard</span>.`;
+  sayEl.innerHTML=msg;
+}
+
+/* ---------- buttons ---------- */
+let running=true;
+el('play').addEventListener('click',()=>{
+  running=!running;
+  el('play').textContent=running?'⏸ PAUSE':'▶ RESUME';
+  el('play').classList.toggle('on',running);
+});
+el('freeze').addEventListener('click',()=>{
+  learning=!learning;
+  el('freeze').classList.toggle('on',!learning);
+  el('freeze').textContent=learning?'🔒 NO LEARNING':'🔓 LEARNING OFF';
+  sayEl.innerHTML=learning
+    ? `Learning <b>on</b> — colonies update their policies from payoffs again.`
+    : `Learning <b>frozen</b>. Policies can't change. If the revolution stalls now, that's the proof it had to be <b>learned</b> — not scripted.`;
+});
+el('reset').addEventListener('click',()=>{
+  setSeed((Math.floor(Date.now()%1e9)*2654435761>>>0)||(seed+1));
+  reset(true);
+  sayEl.innerHTML=`New Congress seeded. Thirteen blank-slate minds. <b>Nobody</b> knows revolt is an option worth taking — yet.`;
+});
+
+/* intro */
+el('go').addEventListener('click',()=>{ el('intro').classList.add('hidden'); });
+el('reopen').addEventListener('click',()=>{ el('intro').classList.remove('hidden'); });
+
+/* ============================ main loop ============================
+   Live UX runs training inside rAF (several rounds per frame). The
+   preview tab pauses rAF, so correctness is checked headlessly instead
+   (window.__sim) — never by watching this loop. */
+const ROUNDS_PER_FRAME=2;
+let frame=0;
+function loop(){
+  if(running){ for(let k=0;k<ROUNDS_PER_FRAME;k++) stepRound(); }
+  draw();
+  if(frame%3===0){ updateHUD(); drawSpark(); }
+  frame++;
+  requestAnimationFrame(loop);
+}
+
+/* ============================ headless test harness ============================
+   __sim.run(params, rounds) trains from a blank slate and returns the
+   independence fraction early vs late — proving independence is LEARNED.
+   __sim.freezeTest shows that with learning off it never ignites. */
+window.__sim={
+  get state(){return {round,rebelFrac:+rebelFrac.toFixed(3),committed:committedCount(),
+     params:{TAX:+TAX.toFixed(2),RETAL:+RETAL.toFixed(2),TRADE:+TRADE.toFixed(2)}};},
+  setParams(p){ if(p.TAX!=null)TAX=p.TAX; if(p.RETAL!=null)RETAL=p.RETAL; if(p.TRADE!=null)TRADE=p.TRADE; },
+  reset, stepRound, committedCount,
+  // train from scratch; report avg rebel fraction over the first vs last window
+  run(p={},rounds=900,sd=1){
+    setSeed(sd>>>0||1); reset(true); learning=true;
+    if(p.TAX!=null)TAX=p.TAX; if(p.RETAL!=null)RETAL=p.RETAL; if(p.TRADE!=null)TRADE=p.TRADE;
+    let early=0,late=0; const w=Math.max(20,Math.floor(rounds*0.08));
+    for(let r=0;r<rounds;r++){ const s=stepRound();
+      if(r<w) early+=s.rebelFrac; if(r>=rounds-w) late+=s.rebelFrac; }
+    return {params:{TAX:+TAX.toFixed(2),RETAL:+RETAL.toFixed(2),TRADE:+TRADE.toFixed(2)},
+      rounds, earlyRebel:+(early/w).toFixed(3), lateRebel:+(late/w).toFixed(3),
+      committed:committedCount(), learned:+(late/w - early/w).toFixed(3)};
+  },
+  // identical params, but learning frozen after the blank slate -> should NOT ignite
+  freezeTest(p={},rounds=900,sd=1){
+    setSeed(sd>>>0||1); reset(true); learning=false;
+    if(p.TAX!=null)TAX=p.TAX; if(p.RETAL!=null)RETAL=p.RETAL; if(p.TRADE!=null)TRADE=p.TRADE;
+    let late=0; const w=Math.max(20,Math.floor(rounds*0.08));
+    for(let r=0;r<rounds;r++){ const s=stepRound(); if(r>=rounds-w) late+=s.rebelFrac; }
+    learning=true;
+    return {frozen:true, rounds, lateRebel:+(late/w).toFixed(3), committed:committedCount()};
+  },
+  // sweep tax to show the learned phase transition
+  sweepTax(vals=[0.1,0.3,0.5,0.7,0.9],rounds=900){
+    return vals.map(t=>{ const r=this.run({TAX:t},rounds,7); return {tax:t,lateRebel:r.lateRebel,learned:r.learned}; });
+  }
+};
+
+/* boot */
+resize();
+sliders();
+reset(true);
+for(let i=0;i<40;i++) stepRound();   // a little visible motion before first paint
+updateHUD(); narrate();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
