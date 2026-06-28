@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>SOVEREIGN — independence is self-evident, and self-signed</title>
+<style>
+  :root{
+    --red:#c1272d; --white:#f4f1e8; --blue:#3b56b0; --sky:#7da2ff;
+    --gold:#e8c34a; --ink:#06070d; --panel:#0b0f22; --line:#1c2547;
+    --good:#4bd07a; --bad:#ff5a5a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;}
+  body{
+    background:var(--ink); color:var(--white);
+    font-family:"Courier New",monospace; user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #stage{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+
+  #hud{
+    position:fixed;top:0;left:0;right:0;z-index:5;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 52px 10px 14px;background:linear-gradient(#06070dee,#06070d88 70%,#06070d00);
+    pointer-events:none;
+  }
+  #hud .brand{font-size:15px;letter-spacing:3px;color:var(--gold);
+    text-shadow:2px 2px 0 var(--red);white-space:nowrap;}
+  #hud .brand small{display:block;font-size:9px;letter-spacing:1px;color:#9fb0e0;
+    text-shadow:none;margin-top:2px;}
+  .status{flex:1;min-width:200px;}
+  .status .lab{display:flex;justify-content:space-between;font-size:10px;letter-spacing:1px;color:#9fb0e0;margin-bottom:3px;}
+  .status .lab b{color:var(--white);}
+  .bar{height:14px;border:1px solid var(--line);background:#070a16;position:relative;overflow:hidden;}
+  .bar>i{position:absolute;inset:0;width:0%;background:linear-gradient(90deg,#2f7a45,var(--good));transition:width .18s linear;}
+  .bar.broken>i{background:linear-gradient(90deg,#7a1d20,var(--bad));}
+  .pill{font-size:10px;letter-spacing:1px;padding:4px 8px;border:1px solid var(--line);white-space:nowrap;color:var(--ink);background:var(--good);font-weight:bold;}
+  .pill.broken{background:var(--bad);color:var(--white);}
+
+  #deck{
+    position:fixed;left:0;right:0;bottom:0;z-index:5;
+    display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;justify-content:center;
+    padding:10px 14px 12px;background:linear-gradient(#06070d00,#06070dcc 36%,#06070d);
+  }
+  .ctl{display:flex;flex-direction:column;gap:5px;}
+  .ctl .t{font-size:10px;letter-spacing:1px;color:#9fb0e0;text-align:center;}
+  button{
+    font-family:inherit;font-size:12px;letter-spacing:1px;color:var(--white);
+    background:var(--panel);border:2px solid var(--gold);padding:9px 12px;cursor:pointer;
+    transition:transform .07s,background .15s;white-space:nowrap;
+  }
+  button:hover{background:#11183a;transform:translateY(-2px);}
+  button:active{transform:translateY(0);}
+  button.danger{border-color:var(--red);color:#ffd9d0;}
+  button.danger:hover{background:#2a0f10;}
+  button.danger.on{background:var(--red);color:#fff;}
+  button.ghost{border-color:var(--line);color:#9fb0e0;font-size:11px;padding:8px 10px;}
+  .readout{font-size:11px;color:#9fb0e0;letter-spacing:.4px;min-height:30px;text-align:center;width:100%;line-height:1.5;}
+  .readout b{color:var(--gold);} .readout .g{color:var(--good);} .readout .r{color:var(--bad);}
+  .readout code{color:#cdd6f4;background:#070a16;border:1px solid var(--line);padding:1px 5px;font-size:10px;}
+
+  .overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:#06070dee;backdrop-filter:blur(2px);overflow:auto;}
+  .card{max-width:580px;width:100%;border:3px solid var(--gold);background:var(--panel);
+    padding:24px;box-shadow:0 0 0 4px #06070d,0 12px 40px #000;}
+  .card h1{font-size:clamp(19px,5vw,29px);letter-spacing:3px;color:var(--gold);text-shadow:3px 3px 0 var(--red);margin-bottom:6px;}
+  .card .tag{font-size:12px;color:var(--sky);letter-spacing:1px;margin-bottom:16px;}
+  .card p{font-size:13px;line-height:1.65;color:#d7dcef;margin-bottom:12px;}
+  .card p b{color:var(--white);} .card .gold{color:var(--gold);}
+  .card .start{margin-top:8px;width:100%;font-size:14px;padding:13px;border-color:var(--sky);}
+  .iBtn{position:fixed;right:12px;top:12px;z-index:6;width:30px;height:30px;padding:0;border-radius:50%;
+    border:2px solid var(--line);color:#9fb0e0;background:var(--panel);font-size:13px;}
+  .hidden{display:none!important;}
+
+  /* personal sovereign panel */
+  #me .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  #me textarea{width:100%;min-height:64px;background:#070a16;border:1px solid var(--line);color:var(--white);
+    font-family:inherit;font-size:13px;padding:8px;resize:vertical;}
+  #me .kv{font-size:11px;color:#9fb0e0;word-break:break-all;line-height:1.5;margin-bottom:8px;}
+  #me .kv code{color:#cdd6f4;}
+  #me .verdict{font-size:14px;font-weight:bold;letter-spacing:1px;padding:8px 10px;border:1px solid var(--line);text-align:center;}
+  #me .verdict.ok{color:var(--good);border-color:#2f7a45;background:#08160d;}
+  #me .verdict.no{color:var(--bad);border-color:#7a1d20;background:#160808;}
+  #me .verdict.idle{color:#9fb0e0;}
+  .x{position:absolute;right:14px;top:10px;width:30px;height:30px;border-radius:50%;border:2px solid var(--line);
+    color:#9fb0e0;background:var(--panel);font-size:14px;}
+  @media(max-width:600px){ #hud .brand small{display:none;} #deck{gap:8px;padding:9px;} button{font-size:11px;padding:8px 9px;} }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+
+<div id="hud">
+  <div class="brand">★ SOVEREIGN<small>independence is self-evident, and self-signed</small></div>
+  <div class="status">
+    <div class="lab"><span>THE UNION — colonies ratified <span id="sel" style="opacity:.6"></span></span><b id="cnt">0 / 13</b></div>
+    <div class="bar" id="ubar"><i></i></div>
+  </div>
+  <div class="pill" id="pill">CONVENING…</div>
+</div>
+
+<button class="iBtn" id="reopen" title="How it works">ⓘ</button>
+
+<div id="deck">
+  <div class="ctl">
+    <div class="t">forge a fresh union</div>
+    <button class="ghost" id="reratify">↺ RE-RATIFY</button>
+  </div>
+  <div class="ctl">
+    <div class="t">forge a signature</div>
+    <button class="danger" id="tamper">⚔ TAMPER A COLONY</button>
+  </div>
+  <div class="ctl">
+    <div class="t">your own authority</div>
+    <button id="bemine">✶ BECOME A SOVEREIGN</button>
+  </div>
+  <div class="readout" id="say">Each colony signs the union with its own key — no king, no server. Tap a seal to inspect its real signature.</div>
+</div>
+
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>SOVEREIGN</h1>
+    <div class="tag">WEEK 2 · INDEPENDENCE ENGINES · independence is not a symbol, it's a <i>mechanic</i></div>
+    <p>What makes a thing <b>legitimate</b> if there's no king to stamp it? In 1776 the answer was radical: legitimacy comes from <span class="gold">consent</span>, not authority. This is that idea as <b>real cryptography</b>.</p>
+    <p>Every one of the thirteen colonies generates its own key — <b>in your browser, no server, no account</b> — and <b>signs</b> its ratification of the union. Each signature is chained to the one before it, so the thirteen form a single <b>tamper-evident</b> record. This is genuine <b>public-key cryptography</b> (ECDSA P-256, the Web Crypto standard), not a mockup.</p>
+    <p>Then <b>⚔ forge one</b>. Tamper with any colony's signed words and every honest node sees the break instantly — the union rejects the forgery, with <b>no central authority</b> to ask. That's the whole point: a system whose legitimacy <i>nobody</i> can fake, because it rests on math instead of a crown.</p>
+    <p style="color:#9fb0e0;font-size:12px;">Independence as <b>self-sovereignty</b>: be your own authority, prove it to anyone, answer to no one. You can become a sovereign yourself — generate a key and sign your own declaration.</p>
+    <button class="start" id="go">CONVENE THE RATIFICATION ▶</button>
+  </div>
+</div>
+
+<div class="overlay hidden" id="me">
+  <div class="card" style="position:relative;">
+    <button class="x" id="meClose" aria-label="close">✕</button>
+    <h1 style="font-size:22px;">BE YOUR OWN AUTHORITY</h1>
+    <div class="tag">generate a key · sign · let anyone verify — no server</div>
+    <div class="row">
+      <button id="meGen" style="border-color:var(--sky);">① FORGE MY KEY</button>
+      <span class="kv" id="meKey" style="flex:1;min-width:160px;">No key yet. Forge one — it never leaves this page.</span>
+    </div>
+    <p style="font-size:12px;color:#9fb0e0;margin-bottom:6px;">② Write your declaration, then sign it with your private key:</p>
+    <textarea id="meText" spellcheck="false">I am a free and independent state, and I answer to no crown.</textarea>
+    <div class="row" style="margin-top:10px;">
+      <button id="meSign" style="border-color:var(--gold);">② SIGN IT</button>
+      <span class="kv" id="meSig" style="flex:1;min-width:160px;">Unsigned.</span>
+    </div>
+    <p style="font-size:12px;color:#9fb0e0;margin-bottom:6px;">③ Anyone with your public key can verify — and if you change one character, the proof dies:</p>
+    <div class="verdict idle" id="meVerdict">— sign something to begin —</div>
+    <p style="font-size:11px;color:#7c8bbf;margin-top:12px;">Edit the text above after signing and watch the verdict flip to <b style="color:var(--bad)">FORGED</b>. No one validated you but the math — that's sovereignty.</p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ==================================================================
+   SOVEREIGN — independence as self-sovereignty, in real cryptography.
+   13 colonies each generate an ECDSA P-256 keypair (Web Crypto) and
+   SIGN a ratification block chained (SHA-256 hash chain) to the prior
+   one. The union is legitimate with NO central authority — it verifies
+   by math. Tamper any colony's signed words and the chain rejects it.
+   All crypto is real SubtleCrypto; verify headlessly via window.__sov.
+   ================================================================== */
+const subtle = (crypto && crypto.subtle) ? crypto.subtle : null;
+const te = new TextEncoder();
+function hex(buf){ const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=b[i].toString(16).padStart(2,'0'); return s; }
+function trunc(h,n=8){ return h.slice(0,n)+'…'+h.slice(-n); }
+async function sha256hex(bytes){ return hex(await subtle.digest('SHA-256', bytes)); }
+async function genKey(){ return subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']); }
+async function pubHex(key){ return hex(await subtle.exportKey('raw', key)); } // 65-byte uncompressed point
+async function sign(priv, bytes){ return new Uint8Array(await subtle.sign({name:'ECDSA',hash:'SHA-256'}, priv, bytes)); }
+async function verify(pub, sig, bytes){ return subtle.verify({name:'ECDSA',hash:'SHA-256'}, pub, sig, bytes); }
+
+const COLS=[
+  ["NH","New Hampshire"],["MA","Massachusetts"],["RI","Rhode Island"],["CT","Connecticut"],
+  ["NY","New York"],["NJ","New Jersey"],["PA","Pennsylvania"],["DE","Delaware"],
+  ["MD","Maryland"],["VA","Virginia"],["NC","N. Carolina"],["SC","S. Carolina"],["GA","Georgia"]
+];
+const N=COLS.length;
+const GENESIS="We hold these truths to be self-evident, that all are created equal, and that governments derive their just powers from the consent of the governed.";
+
+/* each colony block: { name, statement, pub(CryptoKey), pubHex, priv, sig(Uint8Array),
+   prevHash(hex), blockHash(hex), valid(bool) }   */
+let chain=[];
+let genesisHash="";
+let selected=-1;
+let tamperMode=false;
+let building=false;
+
+function blockBytes(prevHashHex, name, statement, pubhex){
+  return te.encode(prevHashHex + '|' + name + '|' + statement + '|' + pubhex);
+}
+
+/* Build a fresh, honestly-signed chain (real keygen + signatures). */
+async function buildChain(){
+  building=true; updateHUD();
+  genesisHash = await sha256hex(te.encode(GENESIS));
+  const next=[];
+  let prev=genesisHash;
+  for(let i=0;i<N;i++){
+    const [ab,name]=COLS[i];
+    const statement = `${name} ratifies the union of free and independent states.`;
+    const kp = await genKey();
+    const ph = await pubHex(kp.publicKey);
+    const bytes = blockBytes(prev, name, statement, ph);
+    const bh = await sha256hex(bytes);
+    const sg = await sign(kp.privateKey, bytes);
+    next.push({ ab, name, statement, pub:kp.publicKey, priv:kp.privateKey, pubHex:ph,
+                sig:sg, prevHash:prev, blockHash:bh, valid:true });
+    prev = bh;
+    chain = next.slice(); selected=-1; await validate(); building=(i<N-1); updateHUD(); draw();
+  }
+  building=false;
+  await validate(); updateHUD(); draw();
+}
+
+/* Re-verify the whole chain from scratch against the CURRENT statements.
+   Recomputes each block's bytes/hash with the expected previous hash and
+   checks the real signature — so any tamper (and everything downstream)
+   fails. Returns once chain[].valid flags are set. */
+async function validate(){
+  let prev=genesisHash, broken=false;
+  for(let i=0;i<chain.length;i++){
+    const b=chain[i];
+    if(broken){ b.valid=false; continue; }
+    const bytes = blockBytes(prev, b.name, b.statement, b.pubHex);
+    const ok = await verify(b.pub, b.sig, bytes);
+    b.valid = ok;
+    b.blockHash = await sha256hex(bytes); // recomputed link for the next block
+    if(!ok){ broken=true; }
+    prev = b.blockHash;
+  }
+}
+
+function validCount(){ let n=0; for(const b of chain){ if(b.valid) n++; else break; } return n; }
+function firstBroken(){ for(let i=0;i<chain.length;i++) if(!chain[i].valid) return i; return -1; }
+
+/* Tamper: flip the signed words of colony i. The signature was made over the
+   ORIGINAL words, so verification now fails — at i and everything after. */
+async function tamper(i){
+  const b=chain[i]; if(!b) return;
+  if(!b._orig) b._orig=b.statement;
+  b.statement = b.statement.includes(' [forged]')
+    ? b.statement.replace(' [forged]','') // toggle off
+    : b.statement + ' [forged]';
+  await validate(); updateHUD(); draw();
+  const bi=firstBroken();
+  if(bi>=0){
+    sayEl.innerHTML = `<span class="r">⚔ FORGERY DETECTED at ${chain[bi].name}.</span> Its signature no longer matches its words — so this seal <b>and every one after it</b> turn red. No authority had to catch it; the math did.`;
+  } else {
+    sayEl.innerHTML = `Union restored — every signature matches its words again. <span class="g">13/13 ratified.</span>`;
+  }
+}
+
+/* ============================ rendering ============================ */
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+let W=1,H=1,DPR=1,pos=[],hudH=100,deckH=120;
+function resize(){
+  DPR=Math.min(2,window.devicePixelRatio||1);
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=W*DPR; canvas.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  layout();
+}
+window.addEventListener('resize',resize);
+function layout(){
+  const hud=document.getElementById('hud'), deck=document.getElementById('deck');
+  hudH=hud?hud.getBoundingClientRect().height:100;
+  deckH=deck?deck.getBoundingClientRect().height:120;
+  pos=[];
+  const top=hudH+64, bot=H-deckH-18, span=Math.max(120,bot-top);
+  const cx=W*0.5, amp=Math.min(W*0.22,150);
+  for(let i=0;i<N;i++){
+    const t=i/(N-1);
+    pos.push({ x:cx + Math.sin(t*Math.PI*2.3)*amp + (((i*53)%7)-3)*4, y:top + t*span });
+  }
+}
+const genesisPos=()=>({x:W*0.5, y:hudH+28});
+
+function draw(){
+  ctx.fillStyle="#06070d"; ctx.fillRect(0,0,W,H);
+  if(!chain.length){ return; }
+  const g=genesisPos();
+  const bi=firstBroken();
+  // chain links
+  for(let i=0;i<chain.length;i++){
+    const p=pos[i], prev = i===0?g:pos[i-1];
+    const linkBroken = (bi>=0 && i>=bi);
+    ctx.strokeStyle = linkBroken ? "rgba(255,90,90,0.7)" : "rgba(232,195,74,0.5)";
+    ctx.lineWidth = linkBroken?1.5:2.5;
+    if(linkBroken){ ctx.setLineDash([4,4]); } else { ctx.setLineDash([]); }
+    ctx.beginPath(); ctx.moveTo(prev.x,prev.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  // genesis (the Declaration) node
+  ctx.fillStyle="#1b2350"; ctx.strokeStyle=var_gold(); ctx.lineWidth=2;
+  roundedNode(g.x,g.y,16); ctx.fill(); ctx.stroke();
+  ctx.fillStyle="#e8c34a"; ctx.font="bold 12px 'Courier New'"; ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText("§",g.x,g.y+1);
+  ctx.fillStyle="#9fb0e0"; ctx.font="9px 'Courier New'"; ctx.fillText("THE DECLARATION",g.x,g.y-22);
+  // colony seals
+  const pulse=0.5+0.5*Math.sin(Date.now()/450);
+  for(let i=0;i<chain.length;i++){
+    const b=chain[i], p=pos[i], ok=b.valid, isSel=i===selected;
+    const r=15;
+    if(ok){
+      ctx.strokeStyle=`rgba(75,208,122,${0.3+0.4*pulse})`; ctx.lineWidth=isSel?3:1.5;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r+5,0,7); ctx.stroke();
+    }
+    ctx.fillStyle = ok ? "#15351f" : "#3a1414";
+    ctx.strokeStyle = ok ? "#4bd07a" : "#ff5a5a"; ctx.lineWidth=isSel?3.5:2.2;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill(); ctx.stroke();
+    // a wax-seal star, or a crack if forged
+    if(ok){
+      ctx.fillStyle="#cdebd6"; star(p.x,p.y,5,5,2.4);
+    } else {
+      ctx.strokeStyle="#ff9a9a"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(p.x-7,p.y-9); ctx.lineTo(p.x+3,p.y-1); ctx.lineTo(p.x-3,p.y+4); ctx.lineTo(p.x+7,p.y+10); ctx.stroke();
+    }
+    ctx.fillStyle = ok ? "#bff0cf" : "#ffd1d1";
+    ctx.font="bold 9px 'Courier New'"; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(b.ab, p.x, p.y+ (ok? -0.5: 0) );
+    // small status glyph to the side
+    ctx.font="10px 'Courier New'"; ctx.fillStyle = ok ? "#4bd07a" : "#ff5a5a";
+    ctx.fillText(ok?"✓":"✕", p.x+r+8, p.y);
+  }
+}
+function var_gold(){ return "#e8c34a"; }
+function roundedNode(x,y,r){ ctx.beginPath(); ctx.arc(x,y,r,0,7); }
+function star(cx,cy,spikes,outer,inner){
+  let rot=-Math.PI/2, step=Math.PI/spikes; ctx.beginPath();
+  for(let i=0;i<spikes;i++){
+    ctx.lineTo(cx+Math.cos(rot)*outer, cy+Math.sin(rot)*outer); rot+=step;
+    ctx.lineTo(cx+Math.cos(rot)*inner, cy+Math.sin(rot)*inner); rot+=step;
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+/* ============================ HUD ============================ */
+const el=id=>document.getElementById(id);
+const cntEl=el('cnt'), ubarEl=el('ubar'), ubarI=ubarEl.querySelector('i'),
+      pillEl=el('pill'), selEl=el('sel'), sayEl=el('say');
+function updateHUD(){
+  const v=validCount();
+  cntEl.textContent=`${v} / ${N}`;
+  ubarI.style.width=Math.round(v/N*100)+'%';
+  const broken = firstBroken()>=0 && chain.length===N;
+  ubarEl.classList.toggle('broken',broken);
+  if(building){ pillEl.textContent='RATIFYING…'; pillEl.className='pill'; pillEl.style.background='#e8c34a'; }
+  else if(broken){ pillEl.textContent='FORGERY DETECTED'; pillEl.className='pill broken'; pillEl.style.background=''; }
+  else { pillEl.textContent='UNION INTACT'; pillEl.className='pill'; pillEl.style.background=''; }
+}
+
+/* ---- selection / inspect ---- */
+function pickAt(px,py){
+  for(let i=0;i<pos.length;i++){ const p=pos[i]; if((p.x-px)**2+(p.y-py)**2 < 22*22) return i; }
+  return -1;
+}
+function onPointer(ev){
+  const t=ev.touches?ev.touches[0]:ev; const r=canvas.getBoundingClientRect();
+  const i=pickAt(t.clientX-r.left, t.clientY-r.top);
+  if(i<0) return;
+  if(tamperMode){ tamper(i); return; }
+  selected=i; const b=chain[i]; draw();
+  selEl.textContent = `· ${b.name}`;
+  sayEl.innerHTML = `<b>${b.name}</b> ${b.valid?'<span class="g">✓ ratified</span>':'<span class="r">✕ forgery</span>'} · `+
+    `key <code>${trunc(b.pubHex,6)}</code> · signed <code>${trunc(hex(b.sig),6)}</code> · ` +
+    `block <code>${trunc(b.blockHash,6)}</code>${b.valid?'':' — signature does not match the words.'}`;
+}
+canvas.addEventListener('mousedown',onPointer);
+canvas.addEventListener('touchstart',e=>{ e.preventDefault(); onPointer(e); },{passive:false});
+
+/* ---- buttons ---- */
+el('reratify').addEventListener('click',async()=>{
+  if(building) return;
+  tamperMode=false; el('tamper').classList.remove('on');
+  sayEl.textContent='Forging a fresh union — new keys, new signatures…';
+  await buildChain();
+  sayEl.innerHTML='A new union, freshly signed. <span class="g">13/13 ratified.</span> Tap a seal to inspect, or ⚔ forge one.';
+});
+el('tamper').addEventListener('click',()=>{
+  tamperMode=!tamperMode;
+  el('tamper').classList.toggle('on',tamperMode);
+  sayEl.innerHTML = tamperMode
+    ? `<span class="r">Tamper mode on.</span> Tap any seal to forge its signed words — watch the union catch it.`
+    : `Tamper mode off.`;
+});
+
+/* intro + ⓘ */
+el('go').addEventListener('click',()=>{ el('intro').classList.add('hidden'); });
+el('reopen').addEventListener('click',()=>{ el('intro').classList.remove('hidden'); });
+
+/* ============================ personal sovereign ============================ */
+let meKP=null, meSig=null, meSignedText="";
+el('bemine').addEventListener('click',()=>{ el('me').classList.remove('hidden'); });
+el('meClose').addEventListener('click',()=>{ el('me').classList.add('hidden'); });
+el('meGen').addEventListener('click',async()=>{
+  meKP = await genKey(); meSig=null; meSignedText="";
+  const ph = await pubHex(meKP.publicKey);
+  el('meKey').innerHTML = `Public key (share freely): <code>${trunc(ph,10)}</code>`;
+  el('meSig').textContent='Unsigned.';
+  setVerdict('idle','— now sign your declaration —');
+});
+el('meSign').addEventListener('click',async()=>{
+  if(!meKP){ setVerdict('no','Forge a key first.'); return; }
+  meSignedText = el('meText').value;
+  meSig = await sign(meKP.privateKey, te.encode(meSignedText));
+  el('meSig').innerHTML = `Signature: <code>${trunc(hex(meSig),10)}</code>`;
+  await meCheck();
+});
+el('meText').addEventListener('input', ()=>{ if(meSig) meCheck(); });
+async function meCheck(){
+  if(!meKP||!meSig){ setVerdict('idle','— sign something to begin —'); return; }
+  const ok = await verify(meKP.publicKey, meSig, te.encode(el('meText').value));
+  if(ok) setVerdict('ok','✓ VERIFIED — this is genuinely you.');
+  else setVerdict('no','✕ FORGED — the words changed; the proof is void.');
+}
+function setVerdict(kind,msg){ const v=el('meVerdict'); v.className='verdict '+kind; v.textContent=msg; }
+
+/* ============================ headless proof harness ============================
+   The page can't be trusted on my say-so, so prove the crypto is real:
+   __sov.selfTest() does a sign→verify roundtrip + a tamper→reject, and
+   __sov.chainTest() builds the 13-block chain and confirms a forgery at
+   any colony invalidates it and everything after. */
+window.__sov={
+  async selfTest(){
+    const kp=await genKey(); const msg=te.encode("We the People");
+    const sg=await sign(kp.privateKey,msg);
+    const good=await verify(kp.publicKey,sg,msg);
+    const bad =await verify(kp.publicKey,sg,te.encode("We the Peoplx"));
+    const kp2=await genKey();
+    const wrongKey=await verify(kp2.publicKey,sg,msg);
+    return {sigVerifies:good, tamperRejected:!bad, wrongKeyRejected:!wrongKey,
+            algo:'ECDSA P-256 (Web Crypto SubtleCrypto)'};
+  },
+  async chainTest(tamperIdx=6){
+    await buildChain();
+    const before=chain.map(b=>b.valid);
+    await tamper(tamperIdx);
+    const after=chain.map(b=>b.valid);
+    await tamper(tamperIdx); // toggle back
+    const healed=chain.map(b=>b.valid);
+    return { built_all_valid: before.every(Boolean),
+             tamper_at: tamperIdx,
+             valid_after_tamper: after,                 // true up to idx, false from idx on
+             downstream_all_broken: after.slice(tamperIdx).every(v=>v===false),
+             upstream_still_valid: after.slice(0,tamperIdx).every(Boolean),
+             healed_all_valid: healed.every(Boolean) };
+  },
+  get state(){ return { n:chain.length, valid:validCount(), firstBroken:firstBroken(), genesisHash:genesisHash.slice(0,12) }; },
+  async demoBreak(i=6){ if(!chain.length) await buildChain(); selected=-1; tamperMode=false; await tamper(i); el('intro').classList.add('hidden'); return firstBroken(); }
+};
+
+/* gentle redraw loop for the seal pulse (correctness is via __sov, not this) */
+function loop(){ if(chain.length) draw(); requestAnimationFrame(loop); }
+
+/* boot */
+(async function boot(){
+  resize();
+  if(!subtle){ sayEl.innerHTML='<span class="r">Web Crypto unavailable in this browser.</span>'; return; }
+  await buildChain();
+  sayEl.innerHTML='Thirteen colonies, thirteen keys, one signed union. <span class="g">13/13 ratified.</span> Tap a seal to inspect its real signature — or ⚔ forge one.';
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
