@@ -19,5 +19,6 @@ COMPETITORS.local.md
 # OS / editor cruft
 .DS_Store
 
-# Week 3 raw data scratch (baked into week-3/index.html)
+# Week 3 raw data scratch (baked into the builds; served data lives outside .data)
 week-3/.data/
+**/.data/
