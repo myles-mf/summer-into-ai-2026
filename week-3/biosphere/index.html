@@ -79,6 +79,11 @@
   #tourCap b{color:#7ef0c0}
   #tourBtn{font-weight:700}
   #tmBtn.on{border-color:var(--acid);color:var(--acid)}
+  #hint{position:absolute;left:50%;bottom:74px;transform:translateX(-50%);z-index:8;display:none;
+    font-size:12.5px;color:#cfe0ee;background:rgba(8,14,22,.82);border:1px solid #2a3a4e;border-radius:20px;
+    padding:8px 16px;pointer-events:none;animation:hintpulse 1.8s ease-in-out infinite;text-shadow:0 1px 6px #000}
+  #hint.show{display:block} #hint b{color:var(--acid)}
+  @keyframes hintpulse{0%,100%{opacity:.55;transform:translateX(-50%) translateY(0)}50%{opacity:1;transform:translateX(-50%) translateY(-3px)}}
   #ticker{position:absolute;left:16px;bottom:74px;z-index:5;font-size:11px;color:#8aa6bd;line-height:1.7;
     background:rgba(8,14,22,.7);border:1px solid #16242f;border-radius:8px;padding:7px 11px;max-width:46vw;display:none}
   #ticker.show{display:block} #ticker b{color:#cfe0ee} #ticker .hl{color:#ff8a5b}
@@ -100,6 +105,13 @@
   #card .you{color:#8aa6bd;font-style:italic;font-size:12.5px;margin-top:14px}
   #go{margin-top:20px;font-size:15px;font-weight:800;padding:13px 26px;border-color:var(--acid);color:var(--acid);letter-spacing:.04em}
   #go:hover{background:var(--acid);color:#04140d}
+  #sources{margin-top:18px;max-width:520px}
+  #sources summary{cursor:pointer;font-size:11px;letter-spacing:.1em;color:#8aa6bd;list-style:none}
+  #sources summary::-webkit-details-marker{display:none}
+  #sources summary::before{content:"▸ ";color:var(--acid)}
+  #sources[open] summary::before{content:"▾ "}
+  #sources .sc{font-size:11.5px;color:#8aa6bd;line-height:1.8;margin-top:5px}
+  #sources a{color:var(--acid);text-decoration:none}
   .hide{display:none!important}
   @media (max-width:760px){
     #hud{max-width:62vw} #ttl{font-size:18px}
@@ -153,6 +165,7 @@
   <div id="track"><div class="rail"></div><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>
 </div>
 <div id="ticker"></div>
+<div id="hint">👆 flip on a <b>layer</b> (top-right) &mdash; or press <b>🎬 tour</b></div>
 <div id="tourCap"></div>
 <div id="detail"></div>
 
@@ -169,6 +182,15 @@
     <p>Spin the Earth. Turn on a layer and watch it come alive — <b>thousands of river gauges reporting their flow right now, live from the USGS</b>, and the white-nose plague crawling across the bat caves of America, winter by winter.</p>
     <p class="you">For Natasha — who loves this planet and the small wild things on it, and taught me to look closer. 🌎</p>
     <button id="go">▶ enter the biosphere</button>
+    <details id="sources"><summary>the data behind this — all real, all public</summary>
+      <div class="sc">💧 Live streamflow — <a href="https://waterservices.usgs.gov/" target="_blank" rel="noopener">USGS Water Services</a></div>
+      <div class="sc">🦇 White-nose syndrome — <a href="https://www.usgs.gov/tools/white-nose-syndrome-occurrence-map" target="_blank" rel="noopener">USGS / USFWS</a></div>
+      <div class="sc">🔥 Drought — <a href="https://droughtmonitor.unl.edu/" target="_blank" rel="noopener">U.S. Drought Monitor</a></div>
+      <div class="sc">🌿 Critical habitat — <a href="https://ecos.fws.gov/" target="_blank" rel="noopener">USFWS ECOS</a></div>
+      <div class="sc">🌋 Earthquakes — <a href="https://earthquake.usgs.gov/" target="_blank" rel="noopener">USGS</a> · 🔥 wildfires — <a href="https://data-nifc.opendata.arcgis.com/" target="_blank" rel="noopener">NIFC</a></div>
+      <div class="sc">🌀 Hurricanes — <a href="https://www.nhc.noaa.gov/data/" target="_blank" rel="noopener">NOAA HURDAT2</a> · 🌌 aurora — <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener">NOAA SWPC</a></div>
+      <div class="sc">🌎 Basemap — <a href="https://www.naturalearthdata.com/" target="_blank" rel="noopener">Natural Earth</a> (public domain)</div>
+    </details>
   </div>
 </div>
 
@@ -791,7 +813,11 @@ function loop(ts){
 }
 
 // ---------- boot ----------
-document.getElementById('go').onclick=()=>document.getElementById('intro').classList.add('hide');
+const hintEl=document.getElementById('hint'); let hintTimer=null;
+function dismissHint(){ hintEl.classList.remove('show'); clearTimeout(hintTimer); }
+['layers','ctl'].forEach(id=>document.getElementById(id).addEventListener('click',dismissHint,{once:true}));
+document.getElementById('go').onclick=()=>{ document.getElementById('intro').classList.add('hide');
+  setTimeout(()=>{ if(!hintEl.classList.contains('show')){ hintEl.classList.add('show'); hintTimer=setTimeout(dismissHint,9000); } },900); };
 document.getElementById('info').onclick=()=>document.getElementById('intro').classList.remove('hide');
 const loadEl=document.getElementById('loading'), loadbar=document.getElementById('loadbar'), loadtxt=document.getElementById('loadtxt');
 loadtxt.textContent='pulling live river gauges from USGS…';
