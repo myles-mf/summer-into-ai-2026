@@ -792,7 +792,8 @@ tmBtn.onclick=()=>{
 function updateTicker(){
   let bq=null; for(const q of quakeRaw){ if(!bq||q.mag>bq.mag) bq=q; }
   const dpct=document.getElementById('ct-drought').textContent;
-  let h='<div>📡 <b>right now, across America</b></div>';
+  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  let h='<div>📡 <b>right now, across America</b> <span style="color:#5d7388">· '+now+'</span></div>';
   if(biggestRiver) h+='<div>🌊 highest flow: <b>'+biggestRiver.name.replace(/,.*$/,'')+'</b> · '+Math.round(biggestRiver.flow).toLocaleString()+' ft³/s</div>';
   if(bq) h+='<div>🌋 biggest quake (30d): <span class="hl">M'+bq.mag.toFixed(1)+'</span> · '+(bq.place||'').replace(/^.*of /,'')+'</div>';
   if(dpct&&dpct.includes('%')) h+='<div>🔥 <b>'+dpct+'</b> of the US in drought</div>';
