@@ -84,6 +84,7 @@
     padding:8px 16px;pointer-events:none;animation:hintpulse 1.8s ease-in-out infinite;text-shadow:0 1px 6px #000}
   #hint.show{display:block} #hint b{color:var(--acid)}
   @keyframes hintpulse{0%,100%{opacity:.55;transform:translateX(-50%) translateY(0)}50%{opacity:1;transform:translateX(-50%) translateY(-3px)}}
+  @media (prefers-reduced-motion: reduce){ #hint{animation:none;opacity:.9} }
   #ticker{position:absolute;left:16px;bottom:74px;z-index:5;font-size:11px;color:#8aa6bd;line-height:1.7;
     background:rgba(8,14,22,.7);border:1px solid #16242f;border-radius:8px;padding:7px 11px;max-width:46vw;display:none}
   #ticker.show{display:block} #ticker b{color:#cfe0ee} #ticker .hl{color:#ff8a5b}
@@ -117,7 +118,10 @@
     #hud{max-width:62vw} #ttl{font-size:18px}
     #layers{top:auto;bottom:124px;right:8px;left:8px;width:auto;max-width:230px;margin-left:auto;padding:10px;max-height:60vh;overflow:auto}
     #sub{display:none}
-    #ctl{width:95vw;gap:9px;padding:10px}
+    #ctl{width:95vw;gap:8px;padding:10px;flex-wrap:wrap;row-gap:9px}
+    #ctl #track{order:10;flex-basis:100%;min-width:100%;height:24px}
+    #ctl #yr{margin-left:auto}
+    #ticker{display:none!important}
     #src{font-size:8px}
   }
 </style>
@@ -237,6 +241,8 @@ controls.enableDamping=true; controls.dampingFactor=.06;
 controls.minDistance=140; controls.maxDistance=900;
 controls.enablePan=false; controls.autoRotate=true; controls.autoRotateSpeed=.28;
 controls.rotateSpeed=.6;
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(REDUCED) controls.autoRotate=false;
 
 // ---------- starfield ----------
 (function stars(){
@@ -588,6 +594,7 @@ const quakeRaw=[]; // {lng,lat,depth,mag,place,time}
 function depthColor(d){ const t=Math.max(0,Math.min(1,d/250)); return new THREE.Color().setHSL(0.02+0.5*t,0.95,0.55-0.08*t); }
 async function loadQuakes(){
   try{
+    quakeRaw.length=0;
     const j=await (await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson')).json();
     for(const f of j.features){ const c=f.geometry.coordinates, p=f.properties;
       if(!c||!isFinite(c[0])) continue;
@@ -609,6 +616,7 @@ async function loadQuakes(){
 const fireRaw=[]; // {lng,lat,acres,name}
 async function loadFires(){
   try{
+    fireRaw.length=0;
     const feats=await fetchPolys('https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Interagency_Perimeters_Current/FeatureServer/0','poly_GISAcres,poly_IncidentName');
     for(const f of feats){ const rings=(f.geometry&&f.geometry.rings)||[]; let sx=0,sy=0,nn=0;
       for(const ring of rings) for(const p of ring){ sx+=p[0];sy+=p[1];nn++; } if(!nn)continue;
@@ -663,9 +671,10 @@ const STATE_C={Alabama:[32.8,-86.8],Alaska:[64.7,-152.3],Arizona:[34.3,-111.7],A
 const homeSel=document.getElementById('homeSel'), homeOut=document.getElementById('homeOut');
 Object.keys(STATE_C).sort().forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; homeSel.appendChild(o); });
 let tween=null;
-function flyTo(lat,lng,dist){
+let flySpeed=0;
+function flyTo(lat,lng,dist,dur){
   controls.autoRotate=false; controls.enabled=false;
-  tween={from:camera.position.clone(), to:ll(lng,lat,dist||205), t0:performance.now(), dur:1500};
+  tween={from:camera.position.clone(), to:ll(lng,lat,dist||205), t0:performance.now(), dur:dur||flySpeed||1500};
 }
 function nearest(arr, lat, lng, getLatLng){
   let best=null,bd=1e9; const k=Math.cos(lat*DEG);
@@ -721,21 +730,23 @@ const ALL=['water','bats','drought','species','quakes','fires','volcanoes','stor
 function only(...on){ ALL.forEach(k=>setLayer(k,on.includes(k))); }
 async function runTour(){
   if(touring){ touring=false; return; }
-  touring=true; tourBtn.textContent='⏹ stop'; document.getElementById('intro').classList.add('hide');
+  touring=true; tourBtn.textContent='⏹ stop'; document.getElementById('intro').classList.add('hide'); flySpeed=2600;
   const steps=[
-    ()=>{ only('water'); flyTo(39,-98,250); },               'America breathes — nearly <b>9,000 river gauges</b>, reporting their flow <b>live</b> right now.',
-    ()=>{ only('water','bats'); t=0; playing=true; setPlay(); flyTo(41,-80,190); }, 'Then a plague: <b>white-nose syndrome</b> creeps through the bat caves, 2006 onward…',
-    ()=>{ flyTo(46,-119,230); },                              '…and <b>leaps 1,300 miles to Washington State</b> — coast to coast.',
-    ()=>{ only('drought'); flyTo(36,-108,240); },             'The <b>drought belt</b> — where the country is drying out, updated weekly.',
-    ()=>{ only('species'); flyTo(20.6,-157,150); },           '<b>Hawaii</b> — more endangered species packed here than anywhere in America.',
-    ()=>{ only('quakes'); flyTo(44,-150,320); },              'And the ground never rests — <b>every earthquake</b> of the last month, the Ring of Fire alight.',
+    ()=>{ timeMachine=false; only('water'); flyTo(39,-98,250); },  'America breathes — nearly <b>9,000 river gauges</b>, reporting their flow <b>live</b> right now.',
+    ()=>{ only('water','bats'); t=0; playing=true; setPlay(); flyTo(41,-80,185); }, 'Then a plague: <b>white-nose syndrome</b> creeps through the bat caves, winter by winter…',
+    ()=>{ flyTo(46,-119,225); },                              '…and <b>leaps 1,300 miles to Washington State</b> in a single year — coast to coast.',
+    ()=>{ playing=false; only('drought'); flyTo(36,-108,235); }, 'The <b>drought belt</b> — where the country is drying out, redrawn every week.',
+    ()=>{ only('species'); flyTo(20.6,-157,150); },           '<b>Hawaii</b> — more federally endangered species than anywhere else in America.',
+    ()=>{ only('quakes'); flyTo(44,-150,330); },              'The ground never rests — <b>every earthquake of the last month</b>, the Ring of Fire alight.',
     ()=>{ only('aurora'); flyTo(72,-100,300); },              'High above, the sky itself glows — the <b>aurora</b>, live from NOAA space-weather satellites.',
-    ()=>{ only('water','bats','drought','species','quakes','aurora'); flyTo(39,-98,250); }, 'One planet, all at once — <b>every layer, real federal data</b>, the instruments laid bare.'
+    ()=>{ timeMachine=true; lastTMYear=null; only('storms'); layers.histq.o.visible=true; playing=false; t=TOTAL*0.985; updateTimeline(); flyTo(16,-55,440,3000); }, 'Rewind a century — <b>every hurricane and great quake since 1900</b>, a planet of memory.',
+    ()=>{ timeMachine=false; layers.histq.o.visible=false; only('water','bats','drought','species','quakes','aurora'); flyTo(39,-98,255); }, 'One planet, all at once — <b>every layer, real public data</b>, the instruments laid bare.'
   ];
-  for(let i=0;i<steps.length && touring;i+=2){ steps[i](); await showCap(steps[i+1], 5200); }
-  playing=false; setPlay();
-  if(touring){ cap.innerHTML='made from public data · <b>BIOSPHERE</b> 🌎'; cap.style.opacity=1; await sleep(2600); cap.style.opacity=0; }
-  touring=false; tourBtn.textContent='🎬 tour'; controls.autoRotate=true; controls.enabled=true;
+  for(let i=0;i<steps.length && touring;i+=2){ steps[i](); await showCap(steps[i+1], 5600); }
+  playing=false; setPlay(); flySpeed=0;
+  if(touring){ cap.innerHTML='made entirely from public federal data · <b>BIOSPHERE</b> 🌎'; cap.style.opacity=1; await sleep(2800); cap.style.opacity=0; }
+  touring=false; timeMachine=false; tmBtn.classList.remove('on'); layers.histq.o.visible=false;
+  tourBtn.textContent='🎬 tour'; controls.autoRotate=!REDUCED; controls.enabled=true;
 }
 tourBtn.onclick=runTour;
 
@@ -829,8 +840,7 @@ function loop(ts){
     camera.position.copy(dir.multiplyScalar(len)); camera.lookAt(0,0,0);
     if(k>=1){ tween=null; controls.enabled=true; controls.update(); }
   } else controls.update();
-  const et=ts/1000; for(const m of pointMats) m.uniforms.uTime.value=et;
-  updateRings(dt);
+  if(!REDUCED){ const et=ts/1000; for(const m of pointMats) m.uniforms.uTime.value=et; updateRings(dt); }
   composer.render();
   requestAnimationFrame(loop);
 }
@@ -856,6 +866,9 @@ loadFires().then(updateTicker);
 buildVolcanoes();
 loadHistory();
 loadAurora();
+// keep it genuinely live: refresh the light feeds + ticker every 3 min (not mid-tour / time-machine)
+setInterval(()=>{ if(touring||timeMachine||dragging) return;
+  loadQuakes().then(updateTicker); loadAurora(); loadFires().then(updateTicker); loadDrought().then(updateTicker); }, 180000);
 // share-view button
 (function(){ const b=document.createElement('button'); b.textContent='🔗 share this view'; b.id='shareBtn';
   b.style.cssText='width:100%;margin-top:9px;font-size:11px;padding:7px';
