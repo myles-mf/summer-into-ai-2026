@@ -271,7 +271,29 @@ const ocean=new THREE.Mesh(
   }));
 scene.add(ocean);
 
-// ---------- land outlines ----------
+// ---------- filled continents (triangulated, day/night shaded) ----------
+(function fillLand(){
+  const pos=[], idx=[]; let base=0;
+  for(const ring0 of ASSETS.land){
+    const same=ring0.length>1 && ring0[0][0]===ring0[ring0.length-1][0] && ring0[0][1]===ring0[ring0.length-1][1];
+    const ring=same?ring0.slice(0,-1):ring0;
+    if(ring.length<3) continue;
+    let faces; try{ faces=THREE.ShapeUtils.triangulateShape(ring.map(p=>new THREE.Vector2(p[0],p[1])),[]); }catch(e){ continue; }
+    for(const p of ring){ const v=ll(p[0],p[1],R*1.0007); pos.push(v.x,v.y,v.z); }
+    for(const f of faces) idx.push(base+f[0],base+f[1],base+f[2]);
+    base+=ring.length;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3)); g.setIndex(idx);
+  const m=new THREE.ShaderMaterial({ uniforms:{uSun:{value:SUN.clone()}},
+    vertexShader:`varying vec3 vN; void main(){ vN=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader:`varying vec3 vN; uniform vec3 uSun; void main(){ float day=smoothstep(-0.2,0.42,dot(vN,uSun));
+      vec3 night=vec3(0.028,0.052,0.06), dayc=vec3(0.09,0.19,0.17); gl_FragColor=vec4(mix(night,dayc,day),1.0); }`
+  });
+  scene.add(new THREE.Mesh(g,m));
+})();
+
+// ---------- land outlines (glow on top of the fill) ----------
 (function land(){
   const pts=[];
   for(const ring of ASSETS.land){
@@ -280,7 +302,7 @@ scene.add(ocean);
     }
   }
   const g=new THREE.BufferGeometry().setFromPoints(pts);
-  scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x2fae8a,transparent:true,opacity:.55})));
+  scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x3fbf97,transparent:true,opacity:.5})));
 })();
 
 // ---------- atmosphere ----------
