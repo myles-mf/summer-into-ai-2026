@@ -9,9 +9,15 @@ SUBMISSION.md
 # Local tooling / harness config — not part of the public deliverable
 .claude/
 
+# Private working brain for Claude — full project memory, never published
+CLAUDE.md
+
 # Private competitor watch — reference only, never published
 COMPETITORS.local.md
 **/*.local.md
 
 # OS / editor cruft
 .DS_Store
+
+# Week 3 raw data scratch (baked into week-3/index.html)
+week-3/.data/
