@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>PERPETUAL UNION — out of many, one</title>
+<style>
+  :root{--red:#c1272d;--white:#f4f1e8;--blue:#3b56b0;--sky:#7da2ff;--gold:#e8c34a;--ink:#04050b;--panel:#0b0f22;--line:#1c2547;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:var(--ink);color:var(--white);font-family:"Courier New",monospace;user-select:none;-webkit-tap-highlight-color:transparent;}
+  #stage{position:fixed;inset:0;} canvas{display:block;width:100%;height:100%;touch-action:none;}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:10px 52px 10px 14px;background:linear-gradient(#04050bdd,#04050b88 70%,#04050b00);pointer-events:none;}
+  #hud .brand{font-size:15px;letter-spacing:3px;color:var(--gold);text-shadow:2px 2px 0 var(--red);white-space:nowrap;}
+  #hud .brand small{display:block;font-size:9px;letter-spacing:1px;color:#9fb0e0;text-shadow:none;margin-top:2px;}
+  .count{font-size:11px;letter-spacing:1px;color:#9fb0e0;} .count b{color:var(--white);}
+  #deck{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;
+    justify-content:center;padding:10px 14px 12px;background:linear-gradient(#04050b00,#04050bcc 36%,#04050b);}
+  .ctl{display:flex;flex-direction:column;gap:5px;} .ctl .t{font-size:10px;letter-spacing:1px;color:#9fb0e0;text-align:center;}
+  button{font-family:inherit;font-size:12px;letter-spacing:1px;color:var(--white);background:var(--panel);border:2px solid var(--gold);
+    padding:9px 12px;cursor:pointer;transition:transform .07s,background .15s;white-space:nowrap;}
+  button:hover{background:#11183a;transform:translateY(-2px);} button:active{transform:translateY(0);}
+  button.ghost{border-color:var(--line);color:#9fb0e0;font-size:11px;padding:8px 10px;} button.ghost.on{background:#11183a;color:#fff;}
+  .readout{font-size:11px;color:#9fb0e0;letter-spacing:.4px;min-height:14px;text-align:center;width:100%;line-height:1.5;}
+  .readout b{color:var(--gold);}
+  .overlay{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:#04050bee;backdrop-filter:blur(2px);overflow:auto;}
+  .card{max-width:560px;border:3px solid var(--gold);background:var(--panel);padding:24px;box-shadow:0 0 0 4px #04050b,0 12px 40px #000;}
+  .card h1{font-size:clamp(19px,5vw,29px);letter-spacing:3px;color:var(--gold);text-shadow:3px 3px 0 var(--red);margin-bottom:6px;}
+  .card .tag{font-size:12px;color:var(--sky);letter-spacing:1px;margin-bottom:16px;}
+  .card p{font-size:13px;line-height:1.65;color:#d7dcef;margin-bottom:12px;} .card p b{color:var(--white);} .card .gold{color:var(--gold);}
+  .card .start{margin-top:8px;width:100%;font-size:14px;padding:13px;border-color:var(--sky);}
+  .iBtn{position:fixed;right:12px;top:12px;z-index:6;width:30px;height:30px;padding:0;border-radius:50%;border:2px solid var(--line);
+    color:#9fb0e0;background:var(--panel);font-size:13px;}
+  .hidden{display:none!important;}
+  #err{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:24px;background:#04050bf2;color:#ffd9d0;font-size:13px;text-align:center;line-height:1.6;}
+  @media(max-width:600px){#hud .brand small{display:none;}#deck{gap:8px;padding:9px;}button{font-size:11px;padding:8px 9px;}}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="hud">
+  <div class="brand">★ PERPETUAL UNION<small>e pluribus unum — out of many, one</small></div>
+  <div class="count" id="count"></div>
+</div>
+<button class="iBtn" id="reopen" title="How it works">ⓘ</button>
+<div id="deck">
+  <div class="ctl"><div class="t">tear it apart</div><button id="scatter">✺ SCATTER THE UNION</button></div>
+  <div class="ctl"><div class="t">&nbsp;</div><button class="ghost" id="reform">↺ RE-FORM</button></div>
+  <div class="readout" id="say">Half a million independent points, no central control, holding one union. <b>Drag across them</b> to scatter — let go and they re-form.</div>
+</div>
+<div class="overlay" id="intro">
+  <div class="card">
+    <h1>PERPETUAL UNION</h1>
+    <div class="tag">WEEK 2 · INDEPENDENCE ENGINES · independence is not a symbol, it's a <i>mechanic</i></div>
+    <p>Every point of light you see is its <b>own sovereign agent</b> — half a million of them, each following only its own simple pull. <b>No conductor. No central control.</b> Yet together they hold one shape: the flag of the union.</p>
+    <p><b>Drag across them</b> and they scatter into chaos — independence pulling every which way. Let go, and with no one giving the order, they <b>find their way back</b> into one. Out of many, one — and the one survives being torn apart.</p>
+    <p style="color:#9fb0e0;font-size:12px;">A union isn't a thing that's held together from the top. It's an <span class="gold">equilibrium</span> a half-million free parts return to on their own. (Runs entirely on your GPU.)</p>
+    <button class="start" id="go">FORM THE UNION ▶</button>
+  </div>
+</div>
+<div id="err"></div>
+<script>
+"use strict";
+/* ==================================================================
+   PERPETUAL UNION — ~1,000,000 GPU particles (1024^2). Each particle
+   springs toward its target in a waving flag (or a 13-star ring),
+   with curl shimmer; drag scatters them and they re-form on their own.
+   Additive points + HDR bloom. Verify headlessly via window.__field.
+   ================================================================== */
+const TEX=1024, N=TEX*TEX;
+const canvas=document.getElementById('c');
+const gl=canvas.getContext('webgl2',{antialias:false,alpha:false});
+const errors=[];
+function fail(m){const e=document.getElementById('err');e.style.display='flex';e.innerHTML=m+'<br><br>Try a desktop Chrome/Edge/Firefox.';}
+if(!gl){ fail('This build needs <b>WebGL2</b>.'); }
+let ok=!!gl;
+if(gl && !gl.getExtension('EXT_color_buffer_float')){ ok=false; fail('Your GPU is missing <b>EXT_color_buffer_float</b>.'); }
+
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)){errors.push(gl.getShaderInfoLog(o));console.error(gl.getShaderInfoLog(o),s);return null;}return o;}
+function prog(vs,fs){const p=gl.createProgram();const v=sh(gl.VERTEX_SHADER,vs),f=sh(gl.FRAGMENT_SHADER,fs);if(!v||!f)return null;
+  gl.attachShader(p,v);gl.attachShader(p,f);gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){errors.push(gl.getProgramInfoLog(p));console.error(gl.getProgramInfoLog(p));return null;}return p;}
+
+/* shared: the flag (target + color) and the star-ring target */
+const GLSL_FLAG=`
+vec3 flagColor(vec2 uv){
+  float row=floor(uv.y*13.0);
+  bool red=mod(row,2.0)<0.5;
+  vec3 c=red?vec3(0.86,0.12,0.16):vec3(0.97,0.96,0.90);
+  if(uv.y>(6.0/13.0) && uv.x<0.40){
+    c=vec3(0.12,0.20,0.62);
+    vec2 lp=vec2(uv.x/0.40, (uv.y-6.0/13.0)/(7.0/13.0));
+    vec2 g=lp*vec2(6.0,5.0);
+    vec2 fa=abs(fract(g+0.5)-0.5);
+    float d=max(fa.x,fa.y);
+    float ck=mod(floor(g.x)+floor(g.y),2.0);
+    if(ck<0.5 && d>0.34) c=vec3(0.98,0.98,0.94);
+  }
+  return c;
+}
+vec3 flagTarget(vec2 uv,float t){
+  float A=1.9;
+  float lx=(uv.x-0.5)*2.0*A;
+  float ly=(uv.y-0.5)*2.0;
+  float z=0.22*sin(uv.x*6.5 - t*1.7) + 0.07*sin(uv.y*4.0 + t*1.1);
+  ly+=0.04*sin(uv.x*6.5 - t*1.7);
+  return vec3(lx,ly,z);
+}
+vec3 ringTarget(vec2 uv,float t){
+  // a 13-point star ring: each particle to one of 13 star clusters on a circle
+  float id=floor(uv.x*1024.0)+floor(uv.y*1024.0)*1024.0;
+  float star=mod(id,13.0);
+  float a=star/13.0*6.2831853 + t*0.12;
+  vec2 ctr=vec2(cos(a),sin(a))*1.45;
+  // 5-point star: radius pinches between 5 spikes
+  float r=fract(id*0.000113);
+  float ang=fract(id*0.00067)*6.2831853;
+  float spike=pow(abs(cos(ang*2.5)),0.5);          // 5 lobes
+  float rad=mix(0.02,0.22,pow(r,0.7))*(0.30+0.70*spike);
+  return vec3(ctr.x+cos(ang)*rad, ctr.y+sin(ang)*rad, 0.08*sin(t+id));
+}`;
+
+const QUAD_VS=`#version 300 es
+in vec2 a; void main(){ gl_Position=vec4(a,0.0,1.0); }`;
+
+const UPDATE_FS=`#version 300 es
+precision highp float;
+${GLSL_FLAG}
+uniform sampler2D posTex,velTex;
+uniform float uTime,uTex,uStiff,uDamp,uTurb,uMorph,uPush;
+uniform vec4 uPointer;
+layout(location=0) out vec4 outPos;
+layout(location=1) out vec4 outVel;
+void main(){
+  vec2 uv=gl_FragCoord.xy/uTex;
+  vec3 p=texture(posTex,uv).xyz;
+  vec3 v=texture(velTex,uv).xyz;
+  vec3 tg=mix(flagTarget(uv,uTime), ringTarget(uv,uTime), uMorph);
+  v+=(tg-p)*uStiff;
+  v+=uTurb*vec3(sin(p.y*2.7+uTime*1.3), cos(p.x*2.9-uTime*1.1), sin((p.x+p.y)*2.1+uTime*0.7));
+  if(uPointer.w>0.0){
+    vec2 d=p.xy-uPointer.xy; float dist=length(d);
+    if(dist<uPointer.w){ float f=1.0-dist/uPointer.w; v+=normalize(vec3(d,0.0001))*f*uPush; v.z+=f*uPush*0.6; }
+  }
+  v*=uDamp; p+=v;
+  outPos=vec4(p,1.0); outVel=vec4(v,0.0);
+}`;
+
+const RENDER_VS=`#version 300 es
+precision highp float;
+${GLSL_FLAG}
+uniform sampler2D posTex; uniform float uTex,uScale,uAspect;
+out vec3 vCol;
+vec3 rot(vec3 p){
+  float cy=cos(-0.22),sy=sin(-0.22); p=vec3(cy*p.x+sy*p.z,p.y,-sy*p.x+cy*p.z);
+  float cx=cos(0.10),sx=sin(0.10); p=vec3(p.x,cx*p.y-sx*p.z,sx*p.y+cx*p.z);
+  return p;
+}
+void main(){
+  float id=float(gl_VertexID);
+  vec2 uv=(vec2(mod(id,uTex),floor(id/uTex))+0.5)/uTex;
+  vec3 p=texture(posTex,uv).xyz;
+  vCol=flagColor(uv);
+  vec3 r=rot(p);
+  gl_Position=vec4(r.x*uScale*uAspect, r.y*uScale, 0.0, 1.0);
+  gl_PointSize=1.5;
+}`;
+const RENDER_FS=`#version 300 es
+precision highp float; in vec3 vCol; out vec4 o;
+void main(){ o=vec4(vCol*0.9,1.0); }`;
+
+const COMPOSITE_FS=`#version 300 es
+precision highp float; uniform sampler2D src; uniform vec2 uRes; out vec4 o;
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes;
+  vec3 base=texture(src,uv).rgb;
+  vec3 b=textureLod(src,uv,2.0).rgb*0.6+textureLod(src,uv,3.0).rgb*0.9
+        +textureLod(src,uv,4.0).rgb*1.0+textureLod(src,uv,5.0).rgb*0.7;
+  vec3 col=base*1.1 + b*0.5;
+  vec2 q=uv-0.5; col*=1.0-dot(q,q)*0.5;
+  col=col/(col+vec3(0.85));
+  col=pow(col,vec3(0.82));
+  o=vec4(col,1.0);
+}`;
+
+let posA,posB,velA,velB,fbo,screenTex,screenFbo,pUpdate,pRender,pComposite,quadVAO,pointVAO;
+function mkF(){ const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,TEX,TEX,0,gl.RGBA,gl.FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);return t;}
+function makeScreen(){ if(!gl)return;
+  if(screenTex)gl.deleteTexture(screenTex); if(screenFbo)gl.deleteFramebuffer(screenFbo);
+  screenTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,screenTex);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,canvas.width,canvas.height,0,gl.RGBA,gl.HALF_FLOAT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  screenFbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,screenFbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,screenTex,0);}
+
+function seed(){
+  const pos=new Float32Array(N*4), vel=new Float32Array(N*4);
+  for(let i=0;i<N;i++){ pos[i*4]=(Math.random()*2-1)*3.4; pos[i*4+1]=(Math.random()*2-1)*2.2; pos[i*4+2]=(Math.random()*2-1)*1.2; pos[i*4+3]=1; }
+  gl.bindTexture(gl.TEXTURE_2D,posA); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,TEX,TEX,0,gl.RGBA,gl.FLOAT,pos);
+  gl.bindTexture(gl.TEXTURE_2D,velA); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,TEX,TEX,0,gl.RGBA,gl.FLOAT,vel);
+}
+function build(){
+  posA=mkF();posB=mkF();velA=mkF();velB=mkF();fbo=gl.createFramebuffer();
+  pUpdate=prog(QUAD_VS,UPDATE_FS); pRender=prog(RENDER_VS,RENDER_FS); pComposite=prog(QUAD_VS,COMPOSITE_FS);
+  if(errors.length){ ok=false; fail('A GPU shader failed:<br><small>'+errors[0].slice(0,160)+'</small>'); return; }
+  quadVAO=gl.createVertexArray(); gl.bindVertexArray(quadVAO);
+  const qb=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,qb); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  pointVAO=gl.createVertexArray(); gl.bindVertexArray(null);
+  seed();
+}
+
+const P={stiff:0.012,damp:0.91,turb:0.0045,push:1.1};
+let frame=0,time=0,morph=0,morphTarget=0,pointer=[0,0,0,0];
+const _l={};
+function loc(p,n){const k=(p.__i||(p.__i=Math.random()))+n; if(_l[k]===undefined)_l[k]=gl.getUniformLocation(p,n); return _l[k];}
+function uf(p,n,v){gl.uniform1f(loc(p,n),v);}
+
+function step(){
+  if(!ok)return;
+  time+=0.016; morph+=(morphTarget-morph)*0.04;
+  gl.useProgram(pUpdate); gl.bindVertexArray(quadVAO);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,posB,0);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT1,gl.TEXTURE_2D,velB,0);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1]);
+  gl.viewport(0,0,TEX,TEX);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,posA);gl.uniform1i(loc(pUpdate,'posTex'),0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,velA);gl.uniform1i(loc(pUpdate,'velTex'),1);
+  uf(pUpdate,'uTime',time);uf(pUpdate,'uTex',TEX);uf(pUpdate,'uStiff',P.stiff);uf(pUpdate,'uDamp',P.damp);
+  uf(pUpdate,'uTurb',P.turb);uf(pUpdate,'uMorph',morph);uf(pUpdate,'uPush',P.push);
+  gl.uniform4fv(loc(pUpdate,'uPointer'),pointer);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+  [posA,posB]=[posB,posA];[velA,velB]=[velB,velA];
+  if(pointer[3]>0) pointer[3]*=0.86, pointer[3]=pointer[3]<0.02?0:pointer[3];
+  frame++;
+}
+function render(){
+  if(!ok)return;
+  gl.useProgram(pRender); gl.bindVertexArray(pointVAO);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,screenFbo); gl.viewport(0,0,canvas.width,canvas.height);
+  gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE,gl.ONE);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,posA);gl.uniform1i(loc(pRender,'posTex'),0);
+  var aspH=canvas.height/canvas.width;
+  var us=Math.min(0.84, 0.95/(1.9*aspH));   // fit the flag's width on tall/portrait screens
+  uf(pRender,'uTex',TEX); uf(pRender,'uScale',us); uf(pRender,'uAspect',aspH);
+  gl.drawArrays(gl.POINTS,0,N);
+  gl.disable(gl.BLEND);
+  gl.bindTexture(gl.TEXTURE_2D,screenTex); gl.generateMipmap(gl.TEXTURE_2D);
+  gl.useProgram(pComposite); gl.bindVertexArray(quadVAO);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,canvas.width,canvas.height);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,screenTex);gl.uniform1i(loc(pComposite,'src'),0);
+  gl.uniform2f(loc(pComposite,'uRes'),canvas.width,canvas.height);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+function resize(){const dpr=Math.min(1.5,window.devicePixelRatio||1);
+  canvas.width=Math.floor(innerWidth*dpr);canvas.height=Math.floor(innerHeight*dpr);makeScreen();}
+addEventListener('resize',resize);
+
+/* pointer -> world (flag plane). screen to world inverse of the render mapping (ignoring small rotation) */
+function toWorld(cx,cy){
+  const x=(cx/innerWidth)*2-1, y=1-(cy/innerHeight)*2;
+  const sc=0.84, asp=canvas.height/canvas.width;
+  return [x/(sc*asp), y/sc];
+}
+function scatterAt(cx,cy,r){ const w=toWorld(cx,cy); pointer=[w[0],w[1],0,r]; }
+const el=id=>document.getElementById(id);
+let drag=false;
+function down(e){drag=true;const t=e.touches?e.touches[0]:e;scatterAt(t.clientX,t.clientY,0.7);}
+function move(e){if(!drag)return;const t=e.touches?e.touches[0]:e;scatterAt(t.clientX,t.clientY,0.7);}
+function up(){drag=false;}
+canvas.addEventListener('mousedown',down);addEventListener('mousemove',move);addEventListener('mouseup',up);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();down(e);},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();move(e);},{passive:false});
+canvas.addEventListener('touchend',up);
+
+el('scatter').addEventListener('click',()=>{ pointer=[0,0,0,2.6]; el('say').innerHTML='Scattered. Watch — <b>no one is calling them back</b>, yet the union re-forms on its own.'; });
+el('reform').addEventListener('click',()=>{ pointer=[0,0,0,0]; el('say').innerHTML='Out of many, one — the union holds.'; });
+el('go').addEventListener('click',()=>el('intro').classList.add('hidden'));
+el('reopen').addEventListener('click',()=>el('intro').classList.remove('hidden'));
+
+window.__field={ get ready(){return ok;}, errors,
+  step(n=60){for(let i=0;i<n;i++)step();return frame;}, render(){render();return true;},
+  scatter(){pointer=[0,0,0,2.6];}, morph(v){morphTarget=v;},
+  stats(){return{ready:ok,frame,particles:N,errors:errors.length};} };
+
+if(ok){ resize(); build();
+  if(ok){ el('count').innerHTML='<b>'+N.toLocaleString()+'</b> sovereign points';
+    for(let i=0;i<80;i++) step(); requestAnimationFrame(function loop(){ step(); render(); requestAnimationFrame(loop); }); } }
+</script>
+</body>
+</html>
