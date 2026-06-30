@@ -146,6 +146,8 @@
   <label class="lyr off" data-layer="volcanoes"><span class="sw" style="color:#ff3b3b"></span><span class="nm">🏔️ Volcanoes</span><span class="ct" id="ct-volcanoes">…</span></label>
   <label class="lyr off" data-layer="storms"><span class="sw" style="color:#9b7bff"></span><span class="nm">🌀 Hurricanes</span><span class="ct" id="ct-storms">…</span></label>
   <label class="lyr off" data-layer="aurora"><span class="sw" style="color:#5effa6"></span><span class="nm">🌌 Aurora</span><span class="ct" id="ct-aurora">…</span></label>
+  <label class="lyr off" data-layer="parks"><span class="sw" style="color:#8fe388"></span><span class="nm">🏞️ National parks</span><span class="ct" id="ct-parks">…</span></label>
+  <label class="lyr off" data-layer="tornadoes"><span class="sw" style="color:#c9a6ff"></span><span class="nm">🌪️ Tornadoes</span><span class="ct" id="ct-tornadoes">…</span></label>
   <div id="home">
     <select id="homeSel"><option value="">fly to a state…</option></select>
     <button id="homeGeo" title="use my location">📍</button>
@@ -385,7 +387,10 @@ function buildOutline(layer, feats, r, colorFn){
 // ================= LAYERS =================
 const layers={ water:pointsLayer(), bats:pointsLayer(), drought:outlineLayer(), species:outlineLayer(),
   quakes:pointsLayer(), fires:pointsLayer(), volcanoes:pointsLayer(), storms:outlineLayer(), histq:pointsLayer(),
-  aurora:pointsLayer() };
+  aurora:pointsLayer(), parks:pointsLayer(), tornadoes:pointsLayer() };
+
+// National Parks (baked: lng,lat,name)
+const NPARKS=[[-154.89,58.58,"Katmai"],[-116.01,33.95,"Joshua Tree"],[-88.89,47.96,"Isle Royale"],[-93.02,34.38,"Hot Springs"],[-155.3,19.4,"Hawaii Volcanoes"],[-156.21,20.71,"Haleakala"],[-104.88,31.81,"Guadalupe Mountains"],[-83.55,35.65,"Great Smoky Mountains"],[-105.56,37.75,"Great Sand Dunes"],[-114.15,38.87,"Great Basin"],[-110.38,43.91,"Grand Teton"],[-112.12,36.07,"Grand Canyon"],[-135.76,58.42,"Glacier Bay"],[-113.87,48.62,"Glacier"],[-153.27,67.65,"Gates of the Arctic"],[-80.89,25.4,"Everglades"],[-81.79,24.64,"Dry Tortugas"],[-149.27,63.62,"Denali"],[-116.41,36.3,"Death Valley"],[-81.56,41.21,"Cuyahoga Valley"],[-122.08,42.92,"Crater Lake"],[-80.78,33.78,"Congaree"],[-119.74,34.04,"Channel Islands"],[-104.41,32.16,"Carlsbad Caverns"],[-111.14,37.99,"Capitol Reef"],[-109.97,38.03,"Canyonlands"],[-112.2,37.55,"Bryce Canyon"],[-107.72,38.58,"Black Canyon of the Gunnison"],[-80.26,25.44,"Biscayne"],[-103.24,29.38,"Big Bend"],[-102.43,43.65,"Badlands"],[-109.56,38.77,"Arches"],[-68.05,44.45,"Acadia"],[-150.09,59.85,"Kenai Fjords"],[-118.36,36.85,"Kings Canyon"],[-159.14,67.34,"Kobuk Valley"],[-154.32,60.2,"Lake Clark"],[-121.45,40.46,"Lassen Volcanic"],[-86.18,37.1,"Mammoth Cave"],[-108.39,37.18,"Mesa Verde"],[-121.48,46.8,"Mount Rainier"],[-121.02,48.4,"North Cascades"],[-123.55,47.69,"Olympic"],[-109.8,34.89,"Petrified Forest"],[-123.95,41.48,"Redwood"],[-105.83,40.36,"Rocky Mountain"],[-111.13,32.24,"Saguaro"],[-118.55,36.52,"Sequoia"],[-78.7,38.26,"Shenandoah"],[-103.25,47.34,"Theodore Roosevelt"],[-93.02,48.1,"Voyageurs"],[-102.87,43.43,"Wind Cave"],[-143.22,61.24,"Wrangell-St. Elias"],[-110.36,44.57,"Yellowstone"],[-119.62,37.82,"Yosemite"],[-112.97,37.3,"Zion"]];
 layers.storms.mat.opacity=0.22; // 1,600 overlapping tracks — keep faint or they blow out
 
 // USGS-monitored volcanoes (baked — name,lat,lng)
@@ -513,6 +518,7 @@ function updateTimeline(){
     if(yr!==lastTMYear){ lastTMYear=yr;
       if(layers.storms.o.visible) buildStorms(yr);
       if(layers.histq.o.visible) buildHistQuakes(yr);
+      if(layers.tornadoes.o.visible) buildTornadoes(yr);
       const s=yr<2006?-1:Math.min(NS-1,yr-2006); if(layers.bats.o.visible) buildBats(s);
     }
   } else {
@@ -552,9 +558,11 @@ renderer.domElement.addEventListener('mousemove',e=>{
   else tip.style.opacity=0;
 });
 function pickTip(){
-  const order=['fires','volcanoes','quakes','water','bats'];
+  const order=['parks','volcanoes','fires','quakes','water','tornadoes','bats'];
   for(const k of order){ const L=layers[k]; if(!L.o.visible) continue;
     const h=ray.intersectObject(L.o); if(!h.length) continue; const i=h[0].index;
+    if(k==='parks'){ return '<b>'+NPARKS[i][2]+'</b><br><span class="s">national park · NPS</span>'; }
+    if(k==='tornadoes'){ const tt=histTorn.filter(x=>timeMachine?x[3]<=lastTMYear:true)[i]; return tt?'<b>F'+tt[2]+' tornado</b><br><span class="s">'+tt[3]+' · NOAA SPC</span>':null; }
     if(k==='water'){ const w=waterRaw[i]; return '<b>'+(w.name||'gauge')+'</b><br><span class="s">'+Math.round(w.flow).toLocaleString()+' ft³/s · live · USGS</span>'; }
     if(k==='quakes'){ const q=quakeRaw[i]; return '<b>M'+q.mag.toFixed(1)+' earthquake</b><br><span class="s">'+(q.place||'')+' · '+Math.round(q.depth)+' km deep</span>'; }
     if(k==='fires'){ const fr=fireRaw[i]; return '<b>'+fr.name+'</b><br><span class="s">active wildfire · '+Math.round(fr.acres).toLocaleString()+' acres</span>'; }
@@ -666,6 +674,35 @@ function buildVolcanoes(){
   document.getElementById('ct-volcanoes').textContent=n.toLocaleString();
 }
 
+// ---------- NATIONAL PARKS (baked) ----------
+function buildParks(){
+  const n=NPARKS.length, pos=new Float32Array(n*3),col=new Float32Array(n*3),siz=new Float32Array(n);
+  for(let i=0;i<n;i++){ const v=ll(NPARKS[i][0],NPARKS[i][1],R*1.016);
+    pos[i*3]=v.x;pos[i*3+1]=v.y;pos[i*3+2]=v.z; const c=new THREE.Color(0x8fe388);
+    col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b; siz[i]=3.6; }
+  const g=layers.parks.geo;
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  g.setAttribute('size',new THREE.BufferAttribute(siz,1));
+  document.getElementById('ct-parks').textContent=n;
+}
+
+// ---------- TORNADOES (NOAA SPC, F1+, from history sidecar) ----------
+let histTorn=[];
+function buildTornadoes(uptoYear){
+  const sel=uptoYear==null?histTorn:histTorn.filter(t=>t[3]<=uptoYear);
+  const n=sel.length, pos=new Float32Array(n*3),col=new Float32Array(n*3),siz=new Float32Array(n);
+  for(let i=0;i<n;i++){ const t=sel[i]; const v=ll(t[0],t[1],R*1.014);
+    pos[i*3]=v.x;pos[i*3+1]=v.y;pos[i*3+2]=v.z;
+    let b=1; if(uptoYear!=null) b=Math.max(0.12,1-(uptoYear-t[3])/14);
+    const c=new THREE.Color().setHSL(0.75,0.8,0.26+0.05*t[2]);
+    col[i*3]=c.r*b;col[i*3+1]=c.g*b;col[i*3+2]=c.b*b; siz[i]=0.7+t[2]*0.35; }
+  const g=layers.tornadoes.geo;
+  g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  g.setAttribute('size',new THREE.BufferAttribute(siz,1));
+}
+
 // ---------- FLY TO YOUR HOME ----------
 const STATE_C={Alabama:[32.8,-86.8],Alaska:[64.7,-152.3],Arizona:[34.3,-111.7],Arkansas:[34.8,-92.4],California:[37.2,-119.4],Colorado:[39,-105.5],Connecticut:[41.6,-72.7],Delaware:[39,-75.5],Florida:[28.6,-82.4],Georgia:[32.6,-83.4],Hawaii:[20.3,-156.4],Idaho:[44.4,-114.6],Illinois:[40,-89.2],Indiana:[39.9,-86.3],Iowa:[42,-93.5],Kansas:[38.5,-98.4],Kentucky:[37.5,-85.3],Louisiana:[31,-92,],Maine:[45.4,-69.2],Maryland:[39,-76.8],Massachusetts:[42.3,-71.8],Michigan:[44.3,-85.4],Minnesota:[46.3,-94.3],Mississippi:[32.7,-89.7],Missouri:[38.4,-92.5],Montana:[47,-109.6],Nebraska:[41.5,-99.8],Nevada:[39.3,-116.6],"New Hampshire":[43.7,-71.6],"New Jersey":[40.2,-74.7],"New Mexico":[34.4,-106.1],"New York":[42.9,-75.5],"North Carolina":[35.6,-79.4],"North Dakota":[47.4,-100.5],Ohio:[40.3,-82.8],Oklahoma:[35.6,-97.5],Oregon:[44,-120.6],Pennsylvania:[40.9,-77.8],"Rhode Island":[41.7,-71.6],"South Carolina":[33.9,-80.9],"South Dakota":[44.4,-100.2],Tennessee:[35.9,-86.4],Texas:[31.5,-99.3],Utah:[39.3,-111.7],Vermont:[44.1,-72.7],Virginia:[37.5,-78.9],Washington:[47.4,-120.5],"West Virginia":[38.6,-80.6],Wisconsin:[44.6,-89.9],Wyoming:[43,-107.6]};
 const homeSel=document.getElementById('homeSel'), homeOut=document.getElementById('homeOut');
@@ -726,7 +763,7 @@ const cap=document.getElementById('tourCap'), tourBtn=document.getElementById('t
 let touring=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function showCap(html,ms){ cap.innerHTML=html; cap.style.opacity=1; await sleep(ms); cap.style.opacity=0; await sleep(500); }
-const ALL=['water','bats','drought','species','quakes','fires','volcanoes','storms','aurora'];
+const ALL=['water','bats','drought','species','quakes','fires','volcanoes','storms','aurora','parks','tornadoes'];
 function only(...on){ ALL.forEach(k=>setLayer(k,on.includes(k))); }
 async function runTour(){
   if(touring){ touring=false; return; }
@@ -756,9 +793,10 @@ function catColor(w){ return new THREE.Color(w>=137?0xff4df0:w>=113?0xff4d63:w>=
 async function loadHistory(){
   try{
     const h=await (await fetch('./history.json')).json();
-    histStorms=h.storms||[]; histQuakes=h.quakes||[];
+    histStorms=h.storms||[]; histQuakes=h.quakes||[]; histTorn=h.tornadoes||[];
     buildStorms(null); document.getElementById('ct-storms').textContent=histStorms.length.toLocaleString();
-  }catch(e){ document.getElementById('ct-storms').textContent='—'; }
+    buildTornadoes(null); document.getElementById('ct-tornadoes').textContent=histTorn.length.toLocaleString();
+  }catch(e){ document.getElementById('ct-storms').textContent='—'; document.getElementById('ct-tornadoes').textContent='—'; }
 }
 function buildStorms(uptoYear){
   const pos=[],col=[];
@@ -864,6 +902,7 @@ loadSpecies();
 loadQuakes().then(updateTicker);
 loadFires().then(updateTicker);
 buildVolcanoes();
+buildParks();
 loadHistory();
 loadAurora();
 // keep it genuinely live: refresh the light feeds + ticker every 3 min (not mid-tour / time-machine)
