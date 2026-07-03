@@ -217,6 +217,19 @@ function draw(){
     ctx.fillStyle='rgba('+Math.round(140+115*a)+','+Math.round(255)+','+Math.round(150+80*a)+','+(0.5+0.5*a)+')';
     ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill(); ctx.restore(); }
   }
+  // ---- signal flow: pulses of light stream forward through the wires ----
+  const now=performance.now()/1000;
+  for(let l=0;l<Wt.length;l++){
+    let ph=(now*0.55 - l*0.34)%1.5; if(ph<0||ph>1) continue;
+    const w=Wt[l];
+    for(let o=0;o<w.length;o++){ const row=w[o];
+      for(let i=0;i<row.length;i++){ const mag=Math.min(1,Math.abs(row[i])/2); if(mag<0.18) continue;
+        const a=P[l][i], b=P[l+1][o], x=a[0]+(b[0]-a[0])*ph, y=a[1]+(b[1]-a[1])*ph;
+        const al=Math.sin(ph*Math.PI)*mag*0.85;
+        ctx.fillStyle=(row[i]>=0?'rgba(210,255,180,':'rgba(150,225,255,')+al+')';
+        ctx.beginPath(); ctx.arc(x,y,1.7,0,7); ctx.fill(); }
+    }
+  }
   // input labels
   ctx.fillStyle='rgba(127,151,173,.9)'; ctx.font='10px ui-monospace,monospace'; ctx.textAlign='right';
   for(let o=0;o<LAYERS[0];o++){ const [x,y]=P[0][o]; ctx.fillText(DATA.featNames[o]||('x'+o), x-12, y+3); }
