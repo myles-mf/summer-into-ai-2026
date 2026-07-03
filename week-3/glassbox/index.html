@@ -40,7 +40,23 @@
   #go{margin-top:20px;font-size:15px;font-weight:800;padding:13px 26px;border-color:var(--acid);color:var(--acid)}
   #go:hover{background:var(--acid);color:#05140a}
   .hide{display:none!important}
-  @media (max-width:760px){ #hud{max-width:90vw} #ttl{font-size:18px} #sub{display:none} #ctl{width:94vw;justify-content:center;flex-wrap:wrap} #src{font-size:8px} }
+  #forecast{position:absolute;right:16px;top:44%;transform:translateY(-30%);z-index:6;width:288px;max-width:44vw;
+    background:var(--panel);border:1px solid #1b2735;border-radius:12px;padding:13px 14px;
+    backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+  #forecast h3{margin:0 0 4px;font-size:10px;letter-spacing:.15em;color:var(--acid);font-weight:700}
+  #forecast .cap{font-size:10px;color:var(--faint);margin-bottom:9px}
+  #forecast label{display:block;font-size:11px;color:var(--dim);margin:9px 0 2px}
+  #forecast label b{float:right;color:var(--ink)}
+  #forecast input[type=range]{width:100%;accent-color:var(--acid);height:3px}
+  #forecast .types{display:flex;gap:5px;margin:11px 0 4px}
+  #forecast .types button{flex:1;padding:6px 4px;font-size:10.5px}
+  #forecast .types button.on{border-color:var(--acid);color:var(--acid)}
+  #f-out{margin-top:12px;padding-top:11px;border-top:1px solid #18283a;text-align:center}
+  #f-earn{font-size:30px;font-weight:800;color:var(--cyan);letter-spacing:.02em;text-shadow:0 0 16px rgba(73,214,255,.35)}
+  #f-earn .u{font-size:13px;color:var(--dim);font-weight:400}
+  #f-lab{font-size:10.5px;color:var(--faint);margin-top:2px}
+  #f-verdict{margin-top:9px;font-size:12px;font-weight:700;padding:6px 8px;border-radius:8px;display:inline-block}
+  @media (max-width:760px){ #hud{max-width:90vw} #ttl{font-size:18px} #sub{display:none} #ctl{width:94vw;justify-content:center;flex-wrap:wrap} #src{font-size:8px} #forecast{display:none} }
 </style>
 </head>
 <body>
@@ -55,6 +71,20 @@
     <button id="play">▶ train</button>
     <button id="reset">↺ reset</button>
     <div class="seg"><button data-spd="1" class="on">1×</button><button data-spd="4">4×</button><button data-spd="16">16×</button></div>
+  </div>
+  <div id="forecast">
+    <h3>FORECAST A SCHOOL</h3>
+    <div class="cap">ask the model — updates live as it learns</div>
+    <label>net cost / year <b id="fv-cost">$18k</b><input id="f-cost" type="range" min="0" max="60000" step="1000" value="18000"></label>
+    <label>SAT (selectivity) <b id="fv-sat">1050</b><input id="f-sat" type="range" min="820" max="1560" step="10" value="1050"></label>
+    <label>admit rate <b id="fv-adm">70%</b><input id="f-adm" type="range" min="3" max="100" step="1" value="70"></label>
+    <label>student body <b id="fv-size">3.0k</b><input id="f-size" type="range" min="200" max="45000" step="200" value="3000"></label>
+    <div class="types"><button data-own="1" class="on">public</button><button data-own="2">private</button><button data-own="3">for-profit</button></div>
+    <div id="f-out">
+      <div id="f-earn">$–<span class="u"> /yr</span></div>
+      <div id="f-lab">predicted median earnings, 10 yrs out</div>
+      <div id="f-verdict">—</div>
+    </div>
   </div>
   <button id="info" title="What is this?">ⓘ</button>
   <div id="src">real data: U.S. Dept. of Education · College Scorecard (data.gov) · <span id="nrows">…</span> schools · model + math hand-written, no libraries</div>
@@ -210,7 +240,29 @@ function draw(){
     ctx.fillStyle='rgba(127,151,173,.8)'; ctx.font='10px ui-monospace,monospace'; ctx.textAlign='left'; ctx.fillText('training error ↓', g.lossX, g.lossY-6); }
   // ---- stats ----
   document.getElementById('stats').innerHTML='epoch <b>'+epoch+'</b> · train err <b>'+trainLoss.toFixed(3)+'</b><br>held-out accuracy <b class="r2">R² '+(testR2>0?testR2.toFixed(2):'—')+'</b> <span style="color:#41526a">(1.0 = perfect)</span>';
+  updateForecast();
 }
+// ---------- forecast panel ----------
+let fOwn=1;
+const fE={cost:document.getElementById('f-cost'),sat:document.getElementById('f-sat'),adm:document.getElementById('f-adm'),size:document.getElementById('f-size')};
+const fmt$=v=>v>=1000?'$'+Math.round(v/1000)+'k':'$'+Math.round(v);
+function updateForecast(){
+  const cost=+fE.cost.value, sat=+fE.sat.value, adm=+fE.adm.value/100, size=+fE.size.value, nm=DATA.norm;
+  document.getElementById('fv-cost').textContent=fmt$(cost);
+  document.getElementById('fv-sat').textContent=sat;
+  document.getElementById('fv-adm').textContent=Math.round(adm*100)+'%';
+  document.getElementById('fv-size').textContent=(size/1000).toFixed(1)+'k';
+  const x=[ (cost-nm.xmean[0])/nm.xstd[0], (Math.log10(size+1)-nm.xmean[1])/nm.xstd[1],
+    (adm-nm.xmean[2])/nm.xstd[2], (sat-nm.xmean[3])/nm.xstd[3], fOwn===1?1:0, fOwn===2?1:0, fOwn===3?1:0 ];
+  const A=forward(x); const earn=Math.max(0,A[A.length-1][0]*nm.ystd+nm.ymean);
+  document.getElementById('f-earn').innerHTML=fmt$(Math.round(earn/100)*100)+'<span class="u"> /yr</span>';
+  const ratio=cost>0? earn/(cost*4) : 3, v=document.getElementById('f-verdict');
+  if(ratio>=0.85){ v.textContent='strong value'; v.style.background='rgba(139,255,106,.16)'; v.style.color='#8bff6a'; }
+  else if(ratio>=0.5){ v.textContent='solid'; v.style.background='rgba(73,214,255,.15)'; v.style.color='#49d6ff'; }
+  else { v.textContent='pricey for the payoff'; v.style.background='rgba(255,184,77,.15)'; v.style.color='#ffb84d'; }
+}
+Object.values(fE).forEach(e=>e.addEventListener('input',updateForecast));
+document.querySelectorAll('#forecast .types button').forEach(b=>b.onclick=()=>{ fOwn=+b.dataset.own; document.querySelectorAll('#forecast .types button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); updateForecast(); });
 
 // ---------- loop ----------
 function loop(){ if(playing){ for(let s=0;s<speed;s++) stepEpoch(); } draw(); requestAnimationFrame(loop); }
