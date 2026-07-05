@@ -56,7 +56,9 @@
   #f-earn .u{font-size:13px;color:var(--dim);font-weight:400}
   #f-lab{font-size:10.5px;color:var(--faint);margin-top:2px}
   #f-verdict{margin-top:9px;font-size:12px;font-weight:700;padding:6px 8px;border-radius:8px;display:inline-block}
-  @media (max-width:760px){ #hud{max-width:90vw} #ttl{font-size:18px} #sub{display:none} #ctl{width:94vw;justify-content:center;flex-wrap:wrap} #src{font-size:8px} #forecast{display:none} }
+  @media (max-width:760px){ #hud{max-width:90vw} #ttl{font-size:18px} #sub{display:none} #ctl{width:94vw;justify-content:center;flex-wrap:wrap} #src{font-size:8px}
+    #forecast{display:none;top:auto;bottom:74px;right:8px;left:8px;width:auto;max-width:none;transform:none;max-height:56vh;overflow:auto}
+    #forecast.show{display:block} }
 </style>
 </head>
 <body>
@@ -188,9 +190,14 @@ function stepEpoch(){
 }
 
 // ---------- rendering ----------
-function lay(){ return { netX:W*0.06, netW:Math.min(W*0.44,520), top:H*0.16, bot:H*0.82,
-  scX:W*0.56, scW:Math.min(W*0.36,420), scTop:H*0.18, scH:Math.min(W*0.36,420),
-  lossX:W*0.06, lossW:Math.min(W*0.44,520), lossY:H*0.86, lossH:H*0.10 }; }
+function lay(){
+  if(W<760){ // mobile: stack network / scatter / loss vertically
+    return { netX:W*0.30, netW:W*0.60, top:H*0.14, bot:H*0.46,
+      scX:W*0.30, scW:W*0.60, scTop:H*0.50, scH:H*0.24,
+      lossX:W*0.08, lossW:W*0.84, lossY:H*0.80, lossH:H*0.07, mobile:true }; }
+  return { netX:W*0.06, netW:Math.min(W*0.44,520), top:H*0.16, bot:H*0.82,
+    scX:W*0.56, scW:Math.min(W*0.36,420), scTop:H*0.18, scH:Math.min(W*0.36,420),
+    lossX:W*0.06, lossW:Math.min(W*0.44,520), lossY:H*0.86, lossH:H*0.10 }; }
 function nodePos(L){ const g=lay(); const pos=[]; const cols=LAYERS.length;
   for(let l=0;l<cols;l++){ const x=g.netX+ (g.netW)*(l/(cols-1)); const n=LAYERS[l]; const col=[];
     for(let o=0;o<n;o++){ const y=g.top+(g.bot-g.top)*((o+0.5)/n); col.push([x,y]); } pos.push(col); }
@@ -233,7 +240,7 @@ function draw(){
   // input labels
   ctx.fillStyle='rgba(127,151,173,.9)'; ctx.font='10px ui-monospace,monospace'; ctx.textAlign='right';
   for(let o=0;o<LAYERS[0];o++){ const [x,y]=P[0][o]; ctx.fillText(DATA.featNames[o]||('x'+o), x-12, y+3); }
-  ctx.textAlign='left'; ctx.fillStyle='rgba(139,255,106,.95)'; const oy=P[P.length-1][0]; ctx.fillText('→ earnings', oy[0]+12, oy[1]+3);
+  ctx.textAlign='left'; ctx.fillStyle='rgba(139,255,106,.95)'; const oy=P[P.length-1][0]; ctx.fillText(g.mobile?'→ $':'→ earnings', oy[0]+12, oy[1]+3);
   // ---- predicted vs actual scatter ----
   const nm=DATA.norm; const toK=v=>(v*nm.ystd+nm.ymean)/1000;
   const eMin=(Math.min(...DATA.schools.map(s=>s.earn))/1000), eMax=(Math.max(...DATA.schools.map(s=>s.earn))/1000);
@@ -290,6 +297,13 @@ document.getElementById('go').onclick=()=>{ document.getElementById('intro').cla
 document.getElementById('info').onclick=()=>document.getElementById('intro').classList.remove('hide');
 
 // ---------- boot ----------
+// mobile: forecast is a toggleable bottom sheet
+if(matchMedia('(max-width:760px)').matches){
+  const b=document.createElement('button'); b.textContent='🎛 forecast';
+  b.style.cssText='position:absolute;left:14px;bottom:74px;z-index:7;padding:8px 11px';
+  b.onclick=()=>document.getElementById('forecast').classList.toggle('show');
+  document.getElementById('wrap').appendChild(b);
+}
 initNet(); lastAct=forward(DATA.X[trainI[0]]); testR2=r2(testI); setPlay(); draw(); requestAnimationFrame(loop);
 
 // ---------- verification harness ----------
