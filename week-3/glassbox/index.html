@@ -266,7 +266,7 @@ function draw(){
   updateForecast();
 }
 // ---------- forecast panel ----------
-let fOwn=1;
+let fOwn=1, fEarnEMA=null;
 const fE={cost:document.getElementById('f-cost'),sat:document.getElementById('f-sat'),adm:document.getElementById('f-adm'),size:document.getElementById('f-size')};
 const fmt$=v=>v>=1000?'$'+Math.round(v/1000)+'k':'$'+Math.round(v);
 function updateForecast(){
@@ -277,8 +277,10 @@ function updateForecast(){
   document.getElementById('fv-size').textContent=(size/1000).toFixed(1)+'k';
   const x=[ (cost-nm.xmean[0])/nm.xstd[0], (Math.log10(size+1)-nm.xmean[1])/nm.xstd[1],
     (adm-nm.xmean[2])/nm.xstd[2], (sat-nm.xmean[3])/nm.xstd[3], fOwn===1?1:0, fOwn===2?1:0, fOwn===3?1:0 ];
-  const A=forward(x); const earn=Math.max(0,A[A.length-1][0]*nm.ystd+nm.ymean);
-  document.getElementById('f-earn').innerHTML=fmt$(Math.round(earn/100)*100)+'<span class="u"> /yr</span>';
+  const A=forward(x); const raw=Math.max(0,A[A.length-1][0]*nm.ystd+nm.ymean);
+  fEarnEMA=(fEarnEMA==null)?raw:fEarnEMA+(raw-fEarnEMA)*(Math.abs(raw-fEarnEMA)>3000?0.6:0.07); // snap on slider change, damp training jitter
+  const earn=fEarnEMA;
+  document.getElementById('f-earn').innerHTML=fmt$(Math.round(earn/500)*500)+'<span class="u"> /yr</span>';
   const ratio=cost>0? earn/(cost*4) : 3, v=document.getElementById('f-verdict');
   if(ratio>=0.85){ v.textContent='strong value'; v.style.background='rgba(139,255,106,.16)'; v.style.color='#8bff6a'; }
   else if(ratio>=0.5){ v.textContent='solid'; v.style.background='rgba(73,214,255,.15)'; v.style.color='#49d6ff'; }
@@ -294,7 +296,7 @@ function loop(){ if(playing){ for(let s=0;s<speed;s++) stepEpoch(); } draw(); re
 const playBtn=document.getElementById('play');
 function setPlay(){ playBtn.textContent=playing?'❚❚ pause':(epoch?'▶ resume':'▶ train'); }
 playBtn.onclick=()=>{ playing=!playing; setPlay(); };
-document.getElementById('reset').onclick=()=>{ initNet(); epoch=0;lossHist.length=0;testR2=0;trainLoss=1; predEMA={}; lastAct=forward(DATA.X[trainI[0]]); draw(); };
+document.getElementById('reset').onclick=()=>{ initNet(); epoch=0;lossHist.length=0;testR2=0;trainLoss=1; predEMA={}; fEarnEMA=null; lastAct=forward(DATA.X[trainI[0]]); draw(); };
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{ speed=+b.dataset.spd; document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 document.getElementById('go').onclick=()=>{ document.getElementById('intro').classList.add('hide'); if(!playing){playing=true;setPlay();} };
 document.getElementById('info').onclick=()=>document.getElementById('intro').classList.remove('hide');
