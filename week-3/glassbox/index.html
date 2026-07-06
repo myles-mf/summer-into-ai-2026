@@ -4,15 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>GLASS BOX — watch a neural net learn on real federal data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;800;900&display=swap" rel="stylesheet">
 <style>
-  :root{ --bg:#05070d; --ink:#e8f0f8; --dim:#7f97ad; --faint:#41526a; --acid:#8bff6a; --cyan:#49d6ff; --warm:#ffb84d; --bad:#ff5b6e; --panel:rgba(9,14,22,.82); }
+  :root{ --bg:#0a0a0f; --ink:#f4efe6; --dim:#9a8fa6; --faint:#5a4f66; --acid:#8bff6a; --cyan:#49d6ff; --mag:#ff3b8e; --warm:#ffcf4d; --bad:#ff5b6e; --bone:#f4efe6; --panel:rgba(12,10,16,.86);
+    --disp:'Anton',Impact,sans-serif; --grot:'Archivo',ui-sans-serif,system-ui,sans-serif; }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   #wrap{position:fixed;inset:0}
   canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+  #grain{position:fixed;inset:0;z-index:9;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
   #hud{position:absolute;left:16px;top:14px;z-index:5;pointer-events:none;max-width:52vw}
-  #ttl{font-size:22px;font-weight:800;letter-spacing:.2em;text-shadow:0 0 18px rgba(139,255,106,.4)}
+  #ttl{font-family:var(--disp);font-size:34px;letter-spacing:.02em;line-height:.86;text-transform:uppercase;text-shadow:3px 3px 0 var(--mag)}
   #ttl b{color:var(--acid)}
   #sub{color:var(--dim);font-size:11px;letter-spacing:.04em;margin-top:5px;max-width:380px;line-height:1.5}
   #stats{margin-top:12px;font-size:12px;color:var(--dim);line-height:1.8}
@@ -30,14 +35,19 @@
   #info{position:absolute;right:16px;bottom:18px;z-index:7;width:38px;height:38px;border-radius:50%;padding:0;font-size:17px;display:grid;place-items:center}
   #intro{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:22px;
     background:radial-gradient(120% 90% at 50% 10%,#0a1220,#05070d 70%);overflow:auto}
-  #card{max-width:560px}
-  #card .k{font-size:11px;letter-spacing:.32em;color:var(--acid)}
-  #card h1{font-size:clamp(30px,8vw,52px);margin:.16em 0 .1em;letter-spacing:.1em;text-shadow:0 0 30px rgba(139,255,106,.35)}
-  #card h1 b{color:var(--acid)}
-  #card .sub{color:var(--dim);font-size:13.5px;line-height:1.62;margin-bottom:14px}
-  #card p{color:#c9d8e6;font-size:13.5px;line-height:1.6;margin:10px 0}
-  #card .breath{border-left:2px solid var(--acid);padding:6px 0 6px 12px;color:#dce8f2;font-size:13px}
-  #go{margin-top:20px;font-size:15px;font-weight:800;padding:13px 26px;border-color:var(--acid);color:var(--acid)}
+  #card{max-width:600px;font-family:var(--grot);position:relative;background:var(--bg);border:3px solid var(--bone);
+    padding:34px 34px 30px;box-shadow:12px 12px 0 var(--mag);overflow:hidden}
+  #card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:radial-gradient(var(--faint) 0.6px,transparent 0.7px);background-size:5px 5px;mix-blend-mode:screen}
+  #card .k{font-family:var(--grot);font-weight:900;font-size:11px;letter-spacing:.34em;color:var(--bg);background:var(--acid);display:inline-block;padding:4px 9px}
+  #card h1{font-family:var(--disp);font-size:clamp(46px,11vw,86px);margin:.12em 0 .12em;letter-spacing:.01em;line-height:.84;text-transform:uppercase;color:var(--bone)}
+  #card h1 b{color:var(--acid);-webkit-text-stroke:0;text-shadow:4px 4px 0 var(--mag)}
+  #card .sub{color:var(--dim);font-size:14px;line-height:1.6;margin-bottom:14px;font-weight:600}
+  #card p{color:#d8cfe0;font-size:13.5px;line-height:1.6;margin:10px 0}
+  #card b{color:var(--bone)}
+  #card .breath{border-left:4px solid var(--mag);padding:7px 0 7px 13px;color:#efe6f2;font-size:13.5px;background:rgba(255,59,142,.07)}
+  #go{margin-top:22px;font-family:var(--disp);font-size:22px;letter-spacing:.03em;text-transform:uppercase;padding:12px 26px;background:var(--acid);color:var(--bg);border:3px solid var(--bg);box-shadow:5px 5px 0 var(--mag)}
+  #go:hover{background:var(--mag);color:var(--bone);box-shadow:5px 5px 0 var(--acid)}
   #go:hover{background:var(--acid);color:#05140a}
   .hide{display:none!important}
   #forecast{position:absolute;right:16px;top:44%;transform:translateY(-30%);z-index:6;width:288px;max-width:44vw;
@@ -57,6 +67,7 @@
   #f-lab{font-size:10.5px;color:var(--faint);margin-top:2px}
   #f-verdict{margin-top:9px;font-size:12px;font-weight:700;padding:6px 8px;border-radius:8px;display:inline-block}
   @media (max-width:760px){ #hud{max-width:90vw} #ttl{font-size:18px} #sub{display:none} #ctl{width:94vw;justify-content:center;flex-wrap:wrap} #src{font-size:8px}
+    #info{top:12px;bottom:auto;right:12px}
     #forecast{display:none;top:auto;bottom:74px;right:8px;left:8px;width:auto;max-width:none;transform:none;max-height:56vh;overflow:auto}
     #forecast.show{display:block} }
 </style>
@@ -64,6 +75,7 @@
 <body>
 <div id="wrap">
   <canvas id="cv"></canvas>
+  <div id="grain"></div>
   <div id="hud">
     <div id="ttl">GLASS <b>BOX</b></div>
     <div id="sub">a neural network, hand-written from scratch — no libraries — learning to predict graduate earnings from real U.S. Dept. of Education data. every neuron visible.</div>
@@ -213,7 +225,7 @@ function draw(){
     for(let o=0;o<w.length;o++){ const row=w[o];
       for(let i=0;i<row.length;i++){ const wt=row[i]; const a=P[l][i], b=P[l+1][o];
         const mag=Math.min(1,Math.abs(wt)/2);
-        ctx.strokeStyle=(wt>=0?'rgba(139,255,106,':'rgba(73,214,255,')+(0.05+0.5*mag)+')';
+        ctx.strokeStyle=(wt>=0?'rgba(139,255,106,':'rgba(255,59,142,')+(0.05+0.5*mag)+')';
         ctx.lineWidth=0.3+2.2*mag; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); }
     }
   }
@@ -234,7 +246,7 @@ function draw(){
       for(let i=0;i<row.length;i++){ const mag=Math.min(1,Math.abs(row[i])/2); if(mag<0.18) continue;
         const a=P[l][i], b=P[l+1][o], x=a[0]+(b[0]-a[0])*ph, y=a[1]+(b[1]-a[1])*ph;
         const al=Math.sin(ph*Math.PI)*mag*0.85;
-        ctx.fillStyle=(row[i]>=0?'rgba(210,255,180,':'rgba(150,225,255,')+al+')';
+        ctx.fillStyle=(row[i]>=0?'rgba(210,255,180,':'rgba(255,130,190,')+al+')';
         ctx.beginPath(); ctx.arc(x,y,1.7,0,7); ctx.fill(); }
     }
   }
