@@ -182,8 +182,9 @@ let epoch=0, trainLoss=1, testLoss=1, testR2=0, playing=false, speed=1;
 const lossHist=[]; let lastAct=null; // activations of a probe sample for the network viz
 const BATCH=32;
 function stepEpoch(){
-  // one pass of several minibatches
-  for(let k=0;k<8;k++){ const batch=[]; for(let b=0;b<BATCH;b++) batch.push(trainI[(rnd()*trainI.length)|0]); trainLoss=trainStep(batch,0.006); }
+  // learning-rate decay: big steps early, tiny steps once converged → predictions settle (no forever-bounce)
+  const lr=Math.max(0.0008, 0.006*350/(350+epoch));
+  for(let k=0;k<8;k++){ const batch=[]; for(let b=0;b<BATCH;b++) batch.push(trainI[(rnd()*trainI.length)|0]); trainLoss=trainStep(batch,lr); }
   epoch++;
   if(epoch%2===0){ testLoss=evalLoss(testI); testR2=r2(testI); lossHist.push(trainLoss); if(lossHist.length>240) lossHist.shift(); }
   lastAct=forward(DATA.X[trainI[(rnd()*trainI.length)|0]]);
