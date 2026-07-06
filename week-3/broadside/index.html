@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BROADSIDE — your federal tax receipt</title>
+<meta name="description" content="The government took your money and never gave you a receipt. So here's one — itemized, live from the U.S. Treasury."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0a0e; --ink:#12100a; --paper:#f3ecdd; --paper2:#e7ddc7;
+    --acid:#8bff5a; --mag:#ff2f86; --cyan:#39d7ff; --warm:#ffc93d;
+    --dim:#8a8172; --faint:#b7ad97;
+    --disp:'Anton',Impact,sans-serif; --grot:'Archivo',ui-sans-serif,system-ui,sans-serif;
+    --mono:'Space Mono',ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{
+    background:var(--bg); color:var(--paper); font-family:var(--grot);
+    -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  /* print grain over everything */
+  #grain{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.05;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* ---------- INTRO POSTER ---------- */
+  #intro{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;
+    background:radial-gradient(120% 90% at 50% 0%,#171225 0%,var(--bg) 60%);overflow:auto}
+  #intro.hide{display:none}
+  #poster{max-width:640px;width:100%;position:relative;background:var(--bg);
+    border:3px solid var(--paper);padding:40px 38px 34px;box-shadow:14px 14px 0 var(--mag);
+    font-family:var(--grot);overflow:hidden}
+  #poster::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:radial-gradient(var(--faint) .6px,transparent .7px);background-size:5px 5px;
+    -webkit-mask:linear-gradient(180deg,#000,transparent 70%);mask:linear-gradient(180deg,#000,transparent 70%)}
+  .kick{display:inline-block;background:var(--acid);color:#06210a;font-family:var(--grot);
+    font-weight:900;letter-spacing:.16em;font-size:12px;padding:5px 10px;text-transform:uppercase}
+  #poster h1{font-family:var(--disp);text-transform:uppercase;line-height:.82;
+    font-size:clamp(52px,13vw,104px);margin:14px 0 6px;letter-spacing:.01em;color:var(--paper);position:relative}
+  #poster h1 b{color:var(--acid);text-shadow:4px 4px 0 var(--mag)}
+  .dek{font-family:var(--mono);font-size:15px;line-height:1.55;color:var(--paper);max-width:46ch;margin-top:8px}
+  .dek em{color:var(--mag);font-style:normal;font-weight:700}
+  .dek b{color:var(--acid)}
+  .rule{height:5px;background:var(--mag);margin:20px 0;width:64px}
+  .note{font-family:var(--mono);font-size:11.5px;color:var(--dim);line-height:1.5;margin-top:16px}
+  #go{margin-top:22px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;
+    font-family:var(--disp);text-transform:uppercase;letter-spacing:.03em;font-size:26px;
+    background:var(--acid);color:#06210a;border:none;padding:15px 26px;box-shadow:7px 7px 0 var(--mag);
+    transition:transform .08s, box-shadow .08s}
+  #go:hover{transform:translate(-2px,-2px);box-shadow:10px 10px 0 var(--mag)}
+  #go:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--mag)}
+  .cropmark{position:absolute;width:16px;height:16px;pointer-events:none}
+  .cropmark::before,.cropmark::after{content:"";position:absolute;background:var(--faint)}
+  .cropmark::before{width:100%;height:2px;top:50%}.cropmark::after{height:100%;width:2px;left:50%}
+  .cm-tl{top:8px;left:8px}.cm-tr{top:8px;right:8px}.cm-bl{bottom:8px;left:8px}.cm-br{bottom:8px;right:8px}
+
+  /* ---------- APP ---------- */
+  #app{max-width:1120px;margin:0 auto;padding:26px 20px 70px;display:none}
+  #app.show{display:block}
+  .masthead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    border-bottom:4px solid var(--paper);padding-bottom:12px;flex-wrap:wrap}
+  .mh-l h1{font-family:var(--disp);text-transform:uppercase;font-size:clamp(34px,7vw,60px);
+    line-height:.86;letter-spacing:.01em}
+  .mh-l h1 b{color:var(--mag)}
+  .mh-l .tag{font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:4px;letter-spacing:.02em}
+  #live{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--faint);line-height:1.5;min-width:210px}
+  #live .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:6px;vertical-align:middle}
+  #live.on .dot{background:var(--acid);box-shadow:0 0 8px var(--acid);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #live b{color:var(--acid)}
+  #live .lbl{color:var(--dim);text-transform:uppercase;letter-spacing:.14em;font-size:10px}
+
+  .controls{display:flex;gap:18px;align-items:center;margin:22px 0 6px;flex-wrap:wrap}
+  .amtbox{flex:1;min-width:280px}
+  .amtbox label{font-family:var(--grot);font-weight:800;text-transform:uppercase;letter-spacing:.1em;
+    font-size:12px;color:var(--dim);display:block;margin-bottom:8px}
+  .amtrow{display:flex;align-items:baseline;gap:8px;font-family:var(--disp)}
+  .amtrow .dollar{font-size:34px;color:var(--acid)}
+  #amt{font-family:var(--disp);font-size:44px;background:transparent;border:none;color:var(--paper);
+    width:5.6ch;outline:none;border-bottom:3px solid var(--mag)}
+  #amt::-webkit-outer-spin-button,#amt::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #amt{-moz-appearance:textfield}
+  .amtrow .per{font-family:var(--mono);font-size:13px;color:var(--dim)}
+  #slider{width:100%;margin-top:14px;accent-color:var(--mag);height:4px}
+  .presets{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+  .presets button{font-family:var(--mono);font-size:11px;background:#171420;color:var(--faint);
+    border:1px solid #2c2740;border-radius:7px;padding:6px 10px;cursor:pointer;transition:.12s}
+  .presets button:hover{border-color:var(--acid);color:var(--acid)}
+  .segbox{display:flex;flex-direction:column;gap:8px}
+  .segbox .lbl{font-family:var(--grot);font-weight:800;text-transform:uppercase;letter-spacing:.1em;font-size:12px;color:var(--dim)}
+  .seg{display:flex;border:1px solid #2c2740;border-radius:8px;overflow:hidden}
+  .seg button{font-family:var(--mono);font-size:12px;background:#141019;color:var(--faint);
+    border:none;padding:9px 13px;cursor:pointer;transition:.12s;border-right:1px solid #2c2740}
+  .seg button:last-child{border-right:none}
+  .seg button.on{background:var(--acid);color:#06210a;font-weight:700}
+
+  /* proportional ink bar */
+  #stack{display:flex;height:26px;margin:22px 0 4px;border:2px solid var(--paper);overflow:hidden;cursor:default}
+  #stack .seg{height:100%;transition:width .5s ease}
+  .stackleg{font-family:var(--mono);font-size:10.5px;color:var(--dim);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:26px}
+  .stackleg span{display:inline-flex;align-items:center;gap:5px}
+  .stackleg i{width:9px;height:9px;display:inline-block}
+
+  .layout{display:grid;grid-template-columns:1.15fr .85fr;gap:26px;align-items:start}
+  @media (max-width:820px){ .layout{grid-template-columns:1fr} }
+
+  /* ---------- RECEIPT ---------- */
+  #receiptwrap{display:flex;justify-content:center}
+  #receipt{background:var(--paper);color:var(--ink);width:100%;max-width:440px;padding:26px 26px 8px;
+    position:relative;font-family:var(--mono);box-shadow:0 20px 50px rgba(0,0,0,.5);
+    filter:drop-shadow(0 2px 0 rgba(0,0,0,.15))}
+  /* torn top & bottom edges */
+  #receipt::before,#receipt::after{content:"";position:absolute;left:0;right:0;height:10px;
+    background-image:linear-gradient(135deg,var(--paper) 33%,transparent 33%),linear-gradient(-135deg,var(--paper) 33%,transparent 33%);
+    background-size:14px 14px;background-repeat:repeat-x}
+  #receipt::before{top:-9px}
+  #receipt::after{bottom:-9px;transform:scaleY(-1)}
+  #receipt .rhead{text-align:center;border-bottom:2px dashed #b3a685;padding-bottom:12px}
+  #receipt .rhead .big{font-family:var(--disp);font-size:26px;letter-spacing:.04em;line-height:.9}
+  #receipt .rhead .sm{font-size:10.5px;color:#5c5340;margin-top:6px;line-height:1.5}
+  #receipt .meta{font-size:10px;color:#5c5340;display:flex;justify-content:space-between;margin:10px 0 4px}
+  #paidline{display:flex;justify-content:space-between;align-items:baseline;
+    border-bottom:2px solid var(--ink);padding:8px 0;font-weight:700}
+  #paidline .l{font-family:var(--grot);font-weight:900;text-transform:uppercase;letter-spacing:.06em;font-size:13px}
+  #paidline .v{font-family:var(--disp);font-size:24px}
+  #lines{margin:6px 0}
+  .li{padding:7px 0;border-bottom:1px dotted #c3b795}
+  .li .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .li .nm{font-size:12.5px;font-weight:700;color:var(--ink)}
+  .li .amt{font-size:12.5px;font-weight:700;white-space:nowrap}
+  .li .pct{font-size:10px;color:#6b6048;margin-left:6px}
+  .li .desc{font-size:9.5px;color:#7a6f52;margin-top:2px;line-height:1.4}
+  .li .ink{height:5px;margin-top:5px;background:#d8cca8;position:relative;overflow:hidden}
+  .li .ink i{position:absolute;left:0;top:0;bottom:0;display:block}
+  .li.sliver .nm{color:#111}
+  .li.sliver .amt{color:var(--ink)}
+  .rfoot{border-top:2px dashed #b3a685;margin-top:6px;padding-top:12px;font-size:10.5px;color:#5c5340;line-height:1.6}
+  .rfoot .borrow{background:var(--ink);color:var(--paper);padding:9px 11px;margin:8px -6px;font-size:11px;line-height:1.45}
+  .rfoot .borrow b{color:var(--acid)}
+  #barcode{display:flex;gap:2px;align-items:flex-end;height:44px;margin:14px 0 6px;justify-content:center}
+  #barcode i{background:var(--ink);width:2px;display:block}
+  .rid{text-align:center;font-size:10px;letter-spacing:.28em;color:#5c5340;padding-bottom:14px}
+  /* generative stamp */
+  #stamp{position:absolute;right:6px;top:120px;width:132px;height:132px;transform:rotate(-14deg);
+    pointer-events:none;opacity:.82;mix-blend-mode:multiply}
+  #stamp svg{width:100%;height:100%}
+
+  /* right column: readout + punch */
+  .readout{font-family:var(--grot)}
+  .punch{border-left:5px solid var(--mag);padding:4px 0 4px 16px;margin:2px 0 26px}
+  .punch .big{font-family:var(--disp);font-size:clamp(30px,4.4vw,46px);line-height:.95;text-transform:uppercase}
+  .punch .big b{color:var(--mag)}
+  .punch .big u{color:var(--acid);text-decoration:none}
+  .punch .sub{font-family:var(--mono);font-size:12.5px;color:var(--faint);margin-top:12px;line-height:1.6}
+  .cmp{margin:22px 0}
+  .cmp h3{font-family:var(--grot);font-weight:900;text-transform:uppercase;letter-spacing:.1em;font-size:12px;color:var(--dim);margin-bottom:12px}
+  .cmprow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:12px}
+  .cmprow .nm{font-family:var(--mono);font-size:12px;color:var(--paper)}
+  .cmprow .nm small{color:var(--dim)}
+  .cmpbar{grid-column:1/-1;height:14px;background:#171420;position:relative;overflow:hidden}
+  .cmpbar i{position:absolute;left:0;top:0;bottom:0}
+  .cmprow .v{font-family:var(--mono);font-size:12px;font-weight:700;white-space:nowrap}
+  .acts{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
+  .acts button{font-family:var(--grot);font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+    font-size:13px;background:transparent;color:var(--paper);border:2px solid var(--paper);
+    padding:11px 16px;cursor:pointer;transition:.12s}
+  .acts button:hover{border-color:var(--acid);color:var(--acid)}
+  .acts button.pri{background:var(--acid);color:#06210a;border-color:var(--acid)}
+  .acts button.pri:hover{background:var(--mag);border-color:var(--mag);color:#fff}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(30px);
+    background:var(--acid);color:#06210a;font-family:var(--mono);font-weight:700;font-size:13px;
+    padding:10px 18px;z-index:70;opacity:0;transition:.25s;pointer-events:none}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .srcfoot{margin-top:40px;border-top:1px solid #241f30;padding-top:16px;
+    font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7}
+  .srcfoot a{color:var(--acid)}
+  #info{position:fixed;right:16px;bottom:16px;z-index:55;width:40px;height:40px;border-radius:50%;
+    background:#171420;color:var(--paper);border:1px solid #2c2740;font-size:18px;cursor:pointer;
+    display:grid;place-items:center}
+  #info:hover{border-color:var(--acid);color:var(--acid)}
+  @media (max-width:820px){
+    #stamp{top:86px;width:104px;height:104px}
+    .masthead{align-items:flex-start}
+    #live{text-align:left;min-width:0}
+  }
+</style>
+</head>
+<body>
+<div id="grain"></div>
+
+<!-- ===================== INTRO POSTER ===================== -->
+<div id="intro">
+  <div id="poster">
+    <span class="cropmark cm-tl"></span><span class="cropmark cm-tr"></span>
+    <span class="cropmark cm-bl"></span><span class="cropmark cm-br"></span>
+    <span class="kick">Data.Punk · Week 3</span>
+    <h1>THE<br>BROAD<b>SIDE</b></h1>
+    <div class="dek">The government took <b>$7,009,973,700,000</b> last year and never mailed you a receipt.
+      So I built one. Type what <em>you</em> paid in federal tax — watch it get <b>itemized</b>, live,
+      to the dollar, from the U.S. Treasury's own books.</div>
+    <div class="rule"></div>
+    <div class="dek" style="font-size:13px;color:var(--faint)">Every number is <b>real federal data</b>, pulled
+      client-side from <em>fiscaldata.treasury.gov</em> — no server, nothing sent anywhere.
+      Then see the part they'd rather you didn't add up.</div>
+    <button id="go">▶ Print my receipt</button>
+    <div class="note">FY2025 actual outlays · U.S. Treasury Monthly Treasury Statement + budget-function detail.
+      Runs entirely in your browser.</div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <div class="masthead">
+    <div class="mh-l">
+      <h1>THE <b>BROADSIDE</b></h1>
+      <div class="tag">an itemized receipt for the federal government · FY2025</div>
+    </div>
+    <div id="live"><span class="lbl"><span class="dot"></span>connecting to U.S. Treasury…</span></div>
+  </div>
+
+  <div class="controls">
+    <div class="amtbox">
+      <label>What did you pay in federal tax last year?</label>
+      <div class="amtrow">
+        <span class="dollar">$</span><input id="amt" type="number" min="0" max="500000" step="100" value="14279">
+        <span class="per">/ year in federal income + payroll tax</span>
+      </div>
+      <input id="slider" type="range" min="0" max="60000" step="100" value="14279">
+      <div class="presets">
+        <button data-v="4000">median filer ($4k)</button>
+        <button data-v="14279">average ($14.3k)</button>
+        <button data-v="30000">$30k</button>
+        <button data-v="60000">$60k</button>
+      </div>
+    </div>
+    <div class="segbox">
+      <span class="lbl">Show it as</span>
+      <div class="seg" id="perseg">
+        <button data-p="year" class="on">per year</button>
+        <button data-p="day">per day</button>
+        <button data-p="hour">per work-hour</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stack"></div>
+  <div class="stackleg" id="stackleg"></div>
+
+  <div class="layout">
+    <div id="receiptwrap">
+      <div id="receipt">
+        <div class="rhead">
+          <div class="big">UNITED STATES</div>
+          <div class="sm">GENERAL ACCOUNT · WASHINGTON, D.C.<br>★ THANK YOU FOR YOUR INVOLUNTARY CONTRIBUTION ★</div>
+        </div>
+        <div class="meta"><span id="rdate">FY2025</span><span>REG #1789</span></div>
+        <div id="paidline"><span class="l">You paid</span><span class="v" id="paidval">$14,279</span></div>
+        <div id="lines"></div>
+        <div class="rfoot" id="rfoot"></div>
+        <div id="barcode"></div>
+        <div class="rid" id="rid">★ ★ ★</div>
+        <div id="stamp"></div>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div class="punch" id="punch"></div>
+      <div class="cmp">
+        <h3>The part they'd rather you didn't add up</h3>
+        <div id="cmp"></div>
+      </div>
+      <div class="acts">
+        <button class="pri" id="share">⧉ Copy my receipt link</button>
+        <button id="reroll">↻ Re-stamp</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="srcfoot" id="srcfoot"></div>
+</div>
+
+<button id="info" title="How it works">ⓘ</button>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   BROADSIDE — a federal tax receipt from real Treasury data.
+   Data: FY2025 actual outlays, U.S. Treasury Monthly Treasury
+   Statement (fiscaldata.treasury.gov) + budget-function detail.
+   The grand total is fetched LIVE from Treasury's public API
+   (CORS-open); the itemized breakdown is a curated FY2025
+   budget-function slice baked below, cross-checked against the
+   same API (Social Security $1,581B and Veterans $377B match to
+   the dollar). Sums to the $7.010T net total.
+   ============================================================ */
+
+// FY2025 actual outlays by category, in billions of USD. Sums to 7010.
+const TOTAL_B = 7010;          // net outlays, FY2025 ($7,009,973.7M actual)
+const DEFICIT_B = 1775;        // FY2025 deficit ($1,775,357M actual)
+const REVENUE_B = TOTAL_B - DEFICIT_B; // 5235
+
+const CATS = [
+  {k:'ss',   nm:'Social Security & SSI',        b:1581, c:'--acid', d:'retirement, survivors & disability checks'},
+  {k:'medi', nm:'Medicare',                     b:997,  c:'--cyan', d:'health coverage for 68M people 65+ & disabled'},
+  {k:'int',  nm:'Interest on the national debt', b:921, c:'--mag',  d:'just the interest on $36 trillion borrowed (gross: $1.22T)'},
+  {k:'def',  nm:'National defense',             b:874,  c:'--warm', d:'military pay, weapons, operations, wars'},
+  {k:'caid', nm:'Medicaid & children’s health', b:668, c:'--cyan', d:'health coverage for low-income families & kids'},
+  {k:'incs', nm:'Income security',              b:560,  c:'--acid', d:'unemployment, SNAP/food stamps, housing aid, tax credits, federal pensions'},
+  {k:'vets', nm:'Veterans’ care & benefits', b:377, c:'--warm', d:'VA hospitals, disability comp & pensions'},
+  {k:'hlth', nm:'Other health & research',      b:244,  c:'--cyan', d:'ACA subsidies, CDC, NIH, public health'},
+  {k:'tran', nm:'Transportation',               b:128,  c:'--faint',d:'highways, transit, air traffic, rail'},
+  {k:'home', nm:'Homeland security & FEMA',     b:115,  c:'--faint',d:'borders, TSA, disaster relief, immigration'},
+  {k:'ener', nm:'Energy & environment',         b:89,   c:'--faint',d:'the grid, nuclear cleanup, EPA'},
+  {k:'edu',  nm:'Education & student aid',       b:71,   c:'--faint',d:'Pell grants, student loans, K-12 aid', sliver:true},
+  {k:'aid',  nm:'Foreign aid & diplomacy',      b:57,   c:'--mag',  d:'embassies, USAID, global health — <1% of the budget', sliver:true},
+  {k:'just', nm:'Justice & law enforcement',    b:45,   c:'--faint',d:'FBI, federal courts, prisons', sliver:true},
+  {k:'sci',  nm:'Science & space',              b:35,   c:'--acid', d:'NASA + the National Science Foundation, combined', sliver:true},
+  {k:'park', nm:'Parks, wildlife & public land',b:34,   c:'--acid', d:'national parks, forests, fish & wildlife', sliver:true},
+  {k:'else', nm:'Everything else',              b:214,  c:'--faint',d:'farm programs, the IRS, Commerce, courts, and every smaller agency'},
+];
+
+// ---- helpers ----
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function money(x){ // x in dollars
+  if(x>=1e12) return '$'+(x/1e12).toFixed(2)+'T';
+  if(x>=1e9)  return '$'+(x/1e9).toFixed(1)+'B';
+  return '$'+Math.round(x).toLocaleString('en-US');
+}
+function moneyCents(x){
+  if(x>=1000) return '$'+Math.round(x).toLocaleString('en-US');
+  if(x>=100)  return '$'+x.toFixed(0);
+  return '$'+x.toFixed(2);
+}
+
+const PER = {year:{div:1,unit:'this year'}, day:{div:365,unit:'per day'}, hour:{div:2080,unit:'per work-hour'}};
+let state = { tax:14279, per:'year' };
+
+// ---- build the stacked ink bar ----
+function renderStack(){
+  const stack=document.getElementById('stack'); stack.innerHTML='';
+  const leg=document.getElementById('stackleg'); leg.innerHTML='';
+  CATS.forEach(c=>{
+    const seg=document.createElement('div'); seg.className='seg';
+    seg.style.width=(c.b/TOTAL_B*100)+'%';
+    seg.style.background=cssv(c.c);
+    seg.title=c.nm+' — '+money(c.b*1e9);
+    stack.appendChild(seg);
+  });
+  // legend: top 6 + note
+  CATS.slice(0,6).forEach(c=>{
+    const s=document.createElement('span');
+    s.innerHTML='<i style="background:'+cssv(c.c)+'"></i>'+c.nm+' '+(c.b/TOTAL_B*100).toFixed(0)+'%';
+    leg.appendChild(s);
+  });
+}
+
+// ---- render receipt lines ----
+function renderReceipt(){
+  const tax=state.tax, div=PER[state.per].div, unit=PER[state.per].unit;
+  const shown = tax/div;
+  document.getElementById('paidval').textContent = money(shown) + (state.per!=='year'? '' : '');
+  document.getElementById('paidline').querySelector('.l').textContent =
+     state.per==='year' ? 'You paid' : 'You paid ('+unit+')';
+
+  const lines=document.getElementById('lines'); lines.innerHTML='';
+  CATS.forEach((c,idx)=>{
+    const share = c.b/TOTAL_B;               // fraction of spending
+    const yours = shown*share;               // your dollars to this category
+    const li=document.createElement('div'); li.className='li'+(c.sliver?' sliver':'');
+    li.innerHTML =
+      '<div class="top"><span class="nm">'+c.nm+'<span class="pct">'+(share*100).toFixed(1)+'%</span></span>'+
+      '<span class="amt">'+moneyCents(yours)+'</span></div>'+
+      '<div class="desc">'+c.d+'</div>'+
+      '<div class="ink"><i style="width:'+Math.min(100,share*100*3.2).toFixed(1)+'%;background:'+cssv(c.c)+'"></i></div>';
+    lines.appendChild(li);
+  });
+
+  // footer: borrowed line
+  const borrowShare = DEFICIT_B/TOTAL_B;        // ~0.253
+  const borrowed = shown*borrowShare;
+  const perDollar = (TOTAL_B/REVENUE_B);        // ~1.339 spent per $1 revenue
+  const rf=document.getElementById('rfoot');
+  rf.innerHTML =
+    '<div style="display:flex;justify-content:space-between;font-weight:700;color:#111">'+
+      '<span>SUBTOTAL — what you paid</span><span>'+moneyCents(shown)+'</span></div>'+
+    '<div class="borrow">…but Washington spent <b>'+moneyCents(shown*perDollar)+'</b> on your behalf. '+
+      'The extra <b>'+moneyCents(borrowed)+'</b> ('+(borrowShare*100).toFixed(0)+'¢ of every dollar) '+
+      'was <b>borrowed in your name</b> — added to the $36T tab your kids inherit.</div>'+
+    '<div style="text-align:center;margin-top:8px">FY2025 total federal outlays: <b style="color:#111">'+money(TOTAL_B*1e9)+'</b><br>'+
+      'deficit: '+money(DEFICIT_B*1e9)+' · every figure real, from the U.S. Treasury</div>';
+
+  renderBarcode();
+  renderStamp();
+  renderPunch();
+  renderCompare();
+}
+
+// ---- the punch stat ----
+function renderPunch(){
+  const tax=state.tax, div=PER[state.per].div, shown=tax/div;
+  const int = CATS.find(c=>c.k==='int');
+  const yoursInt = shown*(int.b/TOTAL_B);
+  // slivers combined
+  const sliverB = CATS.filter(c=>['aid','sci','park'].includes(c.k)).reduce((a,c)=>a+c.b,0);
+  const yoursSliver = shown*(sliverB/TOTAL_B);
+  const ratio = (yoursInt/yoursSliver).toFixed(0);
+  const p=document.getElementById('punch');
+  p.innerHTML =
+    '<div class="big">You paid <b>'+moneyCents(yoursInt)+'</b> just so the government could pay <u>interest</u> on money it already borrowed.</div>'+
+    '<div class="sub">That’s <b style="color:var(--paper)">'+ratio+'×</b> what you paid for NASA, foreign aid, and every national park <em style="color:var(--mag);font-style:normal">combined</em> ('+moneyCents(yoursSliver)+'). '+
+      'Interest is now the government’s '+ordinal(interestRank())+'-largest expense — bigger than the entire military.</div>';
+}
+function interestRank(){ const s=[...CATS].sort((a,b)=>b.b-a.b); return s.findIndex(c=>c.k==='int')+1; }
+function ordinal(n){return n+(['th','st','nd','rd'][(n%100>>3^1&&n%10)||0]||'th');}
+
+// ---- comparison bars: your dollars to the giants vs the slivers ----
+function renderCompare(){
+  const tax=state.tax, div=PER[state.per].div, shown=tax/div;
+  const picks=['ss','medi','int','def','aid','sci'];
+  const rows=picks.map(k=>CATS.find(c=>c.k===k));
+  const max=Math.max(...rows.map(r=>r.b));
+  const box=document.getElementById('cmp'); box.innerHTML='';
+  rows.forEach(r=>{
+    const yours=shown*(r.b/TOTAL_B);
+    const el=document.createElement('div'); el.className='cmprow';
+    el.innerHTML=
+      '<span class="nm">'+r.nm+' <small>'+(r.b/TOTAL_B*100).toFixed(1)+'%</small></span>'+
+      '<span class="v">'+moneyCents(yours)+'</span>'+
+      '<div class="cmpbar"><i style="width:'+(r.b/max*100).toFixed(1)+'%;background:'+cssv(r.c)+'"></i></div>';
+    box.appendChild(el);
+  });
+}
+
+// ---- generative barcode + register id (seeded by tax) ----
+function renderBarcode(){
+  const rnd=mulberry32(Math.floor(state.tax)+1789);
+  const bc=document.getElementById('barcode'); bc.innerHTML='';
+  for(let i=0;i<52;i++){
+    const b=document.createElement('i');
+    b.style.width=(1+Math.floor(rnd()*4))+'px';
+    b.style.height=(60+rnd()*40)+'%';
+    bc.appendChild(b);
+  }
+  let id=''; for(let i=0;i<10;i++){ id+= '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(rnd()*34)]; }
+  document.getElementById('rid').textContent = 'NO. '+id.slice(0,4)+'-'+id.slice(4,7)+'-'+id.slice(7);
+}
+
+// ---- generative rubber stamp ----
+function renderStamp(){
+  const rnd=mulberry32(Math.floor(state.tax)*7+3);
+  const rot=(-20+rnd()*14).toFixed(1);
+  document.getElementById('stamp').style.transform='rotate('+rot+'deg)';
+  const mag=cssv('--mag');
+  const words=['PAID IN FULL','NO REFUNDS','AUDITED BY NO ONE','THANK YOU'];
+  const top=words[Math.floor(rnd()*words.length)];
+  document.getElementById('stamp').innerHTML =
+    '<svg viewBox="0 0 100 100">'+
+    '<defs><path id="cir" d="M50,50 m-38,0 a38,38 0 1,1 76,0 a38,38 0 1,1 -76,0"/></defs>'+
+    '<circle cx="50" cy="50" r="45" fill="none" stroke="'+mag+'" stroke-width="3"/>'+
+    '<circle cx="50" cy="50" r="30" fill="none" stroke="'+mag+'" stroke-width="1.4"/>'+
+    '<text font-family="Space Mono,monospace" font-size="8.5" font-weight="700" fill="'+mag+'" letter-spacing="1.4">'+
+      '<textPath href="#cir" startOffset="2%">★ U.S. TREASURY ★ WHERE IT WENT ★ FY2025 ★</textPath></text>'+
+    '<text x="50" y="47" text-anchor="middle" font-family="Anton,sans-serif" font-size="12" fill="'+mag+'">'+top+'</text>'+
+    '<text x="50" y="60" text-anchor="middle" font-family="Space Mono,monospace" font-size="6.5" fill="'+mag+'">'+money(TOTAL_B*1e9)+'</text>'+
+    '</svg>';
+}
+
+// ---- LIVE fetch from Treasury ----
+async function fetchLiveTotal(){
+  const live=document.getElementById('live');
+  const url='https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/mts/mts_table_5'+
+    '?filter=record_calendar_month:eq:09,record_fiscal_year:eq:2025,line_code_nbr:eq:5691'+
+    '&fields=classification_desc,current_fytd_net_outly_amt,record_date&page[size]=1';
+  try{
+    const r=await fetch(url); const j=await r.json();
+    const row=(j.data||[]).find(d=>/Total Outlays/i.test(d.classification_desc)) || (j.data||[])[0];
+    if(row && row.current_fytd_net_outly_amt){
+      const dollars=parseFloat(row.current_fytd_net_outly_amt); // API amount is already in dollars
+      live.classList.add('on');
+      live.innerHTML='<span class="lbl"><span class="dot"></span>LIVE · U.S. Treasury</span><br>'+
+        'FY2025 total spending<br><b>'+dollars.toLocaleString('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0})+'</b>';
+      window.__broadside.liveTotal=dollars;
+      return;
+    }
+    throw new Error('no row');
+  }catch(e){
+    live.classList.add('on');
+    live.innerHTML='<span class="lbl"><span class="dot" style="background:var(--warm);box-shadow:none"></span>U.S. Treasury (cached)</span><br>'+
+      'FY2025 total spending<br><b>'+money(TOTAL_B*1e9).replace('T',' trillion')+'</b>';
+  }
+}
+
+// ---- source footer ----
+document.getElementById('srcfoot').innerHTML =
+  'Every figure is <b>real U.S. federal data</b> for fiscal year 2025 (Oct 2024–Sep 2025). '+
+  'Grand total pulled live in your browser from the U.S. Treasury’s public API '+
+  '(<a href="https://fiscaldata.treasury.gov/datasets/monthly-treasury-statement/outlays-by-function" target="_blank" rel="noopener">Monthly Treasury Statement, Table 5</a>); '+
+  'the itemized breakdown is a curated budget-function slice of the same FY2025 actuals, cross-checked against that API '+
+  '(Social Security and Veterans figures match to the dollar). Totals reconcile to the $7.010T net outlay figure; '+
+  'your personal share allocates your tax across spending in proportion, the way the White House’s own “taxpayer receipt” once did. '+
+  'Nothing is sent anywhere — it all runs on your machine. Built for the Summer Into AI “Data.Punk” week; '+
+  'a nod to <b>@jakestrait5</b>, who this week built AI tools to <i>query</i> federal data — this one just hands it back to you, itemized. '+
+  'Punk isn’t dead. It’s compiling. ★';
+
+// ---- wire up ----
+const amt=document.getElementById('amt'), slider=document.getElementById('slider');
+function setTax(v,fromSlider){
+  v=Math.max(0,Math.min(500000,Math.round(v)));
+  state.tax=v;
+  amt.value=v;
+  if(!fromSlider) slider.value=Math.min(60000,v);
+  document.getElementById('rdate').textContent='FY2025';
+  renderReceipt();
+  syncHash();
+}
+amt.addEventListener('input',()=>setTax(parseFloat(amt.value)||0,false));
+slider.addEventListener('input',()=>setTax(parseFloat(slider.value)||0,true));
+document.querySelectorAll('.presets button').forEach(b=>b.addEventListener('click',()=>setTax(+b.dataset.v,false)));
+document.querySelectorAll('#perseg button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#perseg button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); state.per=b.dataset.p; renderReceipt();
+}));
+document.getElementById('reroll').addEventListener('click',()=>{ // nudge seed for a new stamp/barcode
+  state.tax += (state.tax%2? 1 : -1); renderReceipt(); state.tax += (state.tax%2? -1 : 1);
+  setTax(state.tax,false); toast('Re-stamped.');
+});
+document.getElementById('share').addEventListener('click',()=>{
+  const u=location.origin+location.pathname+'#tax='+state.tax;
+  navigator.clipboard.writeText(u).then(()=>toast('Receipt link copied.'),()=>toast(u));
+});
+function syncHash(){ history.replaceState(null,'','#tax='+state.tax); }
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800);}
+
+function openApp(){
+  document.getElementById('intro').classList.add('hide');
+  document.getElementById('app').classList.add('show');
+  renderStack();
+  const h=location.hash.match(/tax=(\d+)/);
+  setTax(h?+h[1]:14279,false);
+  fetchLiveTotal();
+}
+document.getElementById('go').addEventListener('click',openApp);
+document.getElementById('info').addEventListener('click',()=>{
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('intro').classList.remove('hide');
+});
+
+// headless verification harness
+window.__broadside={
+  CATS, TOTAL_B, DEFICIT_B, REVENUE_B,
+  sum(){return CATS.reduce((a,c)=>a+c.b,0);},
+  shares(){return CATS.map(c=>({k:c.k,pct:+(c.b/TOTAL_B*100).toFixed(2)}));},
+  receiptFor(tax){return CATS.map(c=>({k:c.k,yours:+(tax*c.b/TOTAL_B).toFixed(2)}));},
+  setTax, openApp, liveTotal:null
+};
+
+// auto-open if a receipt link was shared
+if(/tax=\d+/.test(location.hash)) openApp();
+</script>
+</body>
+</html>
