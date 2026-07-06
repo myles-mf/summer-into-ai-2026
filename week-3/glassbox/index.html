@@ -179,7 +179,7 @@ function r2(list){ let ss=0,tot=0; const ym=list.reduce((a,i)=>a+DATA.y[i],0)/li
 
 // ---------- training state ----------
 let epoch=0, trainLoss=1, testLoss=1, testR2=0, playing=false, speed=1;
-const lossHist=[]; let lastAct=null; // activations of a probe sample for the network viz
+const lossHist=[]; let lastAct=null; let predEMA={}; // predEMA: smoothed scatter positions so dots glide, not jitter
 const BATCH=32;
 function stepEpoch(){
   // learning-rate decay: big steps early, tiny steps once converged → predictions settle (no forever-bounce)
@@ -249,7 +249,9 @@ function draw(){
   ctx.strokeStyle='rgba(127,151,173,.35)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(sX(eMin),sY(eMin)); ctx.lineTo(sX(eMax),sY(eMax)); ctx.stroke();
   ctx.fillStyle='rgba(127,151,173,.8)'; ctx.font='10px ui-monospace,monospace'; ctx.textAlign='center';
   ctx.fillText('predicted vs actual — $K earnings (test set)', g.scX+g.scW/2, g.scTop-8);
-  for(const i of testI){ const A2=forward(DATA.X[i]); const pred=toK(A2[A2.length-1][0]); const act=DATA.schools[i].earn/1000;
+  for(const i of testI){ const A2=forward(DATA.X[i]); const raw=toK(A2[A2.length-1][0]);
+    predEMA[i]=(predEMA[i]===undefined)?raw:predEMA[i]+(raw-predEMA[i])*(Math.abs(raw-predEMA[i])>5?0.5:0.09);  // snap when far (post-jump), smooth when close (damp SGD jitter)
+    const pred=predEMA[i], act=DATA.schools[i].earn/1000;
     const px=sX(act), py=sY(pred); const err=Math.min(1,Math.abs(pred-act)/30);
     ctx.fillStyle='rgba('+Math.round(80+175*err)+','+Math.round(214-120*err)+',255,.72)';
     ctx.beginPath(); ctx.arc(px,py,2.6,0,7); ctx.fill(); }
@@ -292,7 +294,7 @@ function loop(){ if(playing){ for(let s=0;s<speed;s++) stepEpoch(); } draw(); re
 const playBtn=document.getElementById('play');
 function setPlay(){ playBtn.textContent=playing?'❚❚ pause':(epoch?'▶ resume':'▶ train'); }
 playBtn.onclick=()=>{ playing=!playing; setPlay(); };
-document.getElementById('reset').onclick=()=>{ initNet(); epoch=0;lossHist.length=0;testR2=0;trainLoss=1; lastAct=forward(DATA.X[trainI[0]]); draw(); };
+document.getElementById('reset').onclick=()=>{ initNet(); epoch=0;lossHist.length=0;testR2=0;trainLoss=1; predEMA={}; lastAct=forward(DATA.X[trainI[0]]); draw(); };
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{ speed=+b.dataset.spd; document.querySelectorAll('.seg button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); });
 document.getElementById('go').onclick=()=>{ document.getElementById('intro').classList.add('hide'); if(!playing){playing=true;setPlay();} };
 document.getElementById('info').onclick=()=>document.getElementById('intro').classList.remove('hide');
