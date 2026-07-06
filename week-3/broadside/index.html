@@ -10,9 +10,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@600;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0b0a0e; --ink:#12100a; --paper:#f3ecdd; --paper2:#e7ddc7;
-    --acid:#8bff5a; --mag:#ff2f86; --cyan:#39d7ff; --warm:#ffc93d;
-    --dim:#8a8172; --faint:#b7ad97;
+    /* palette drawn from money + government paperwork: cash green, stamp red,
+       treasury gold, teal ledger ink — on cream paper / warm black.
+       (var names kept; --acid now = cash green, --mag now = stamp red.) */
+    --bg:#0e0c08; --ink:#151109; --paper:#f1e8d3; --paper2:#e4d9bf;
+    --acid:#2bb866; --mag:#e4362a; --cyan:#2f9f96; --warm:#e0a836;
+    --dim:#8b8069; --faint:#b3a888;
     --disp:'Anton',Impact,sans-serif; --grot:'Archivo',ui-sans-serif,system-ui,sans-serif;
     --mono:'Space Mono',ui-monospace,Menlo,monospace;
   }
@@ -316,7 +319,7 @@ const CATS = [
   {k:'home', nm:'Homeland security & FEMA',     b:115,  c:'--faint',d:'borders, TSA, disaster relief, immigration'},
   {k:'ener', nm:'Energy & environment',         b:89,   c:'--faint',d:'the grid, nuclear cleanup, EPA'},
   {k:'edu',  nm:'Education & student aid',       b:71,   c:'--faint',d:'Pell grants, student loans, K-12 aid', sliver:true},
-  {k:'aid',  nm:'Foreign aid & diplomacy',      b:57,   c:'--mag',  d:'embassies, USAID, global health — <1% of the budget', sliver:true},
+  {k:'aid',  nm:'Foreign aid & diplomacy',      b:57,   c:'--warm', d:'embassies, USAID, global health — <1% of the budget', sliver:true},
   {k:'just', nm:'Justice & law enforcement',    b:45,   c:'--faint',d:'FBI, federal courts, prisons', sliver:true},
   {k:'sci',  nm:'Science & space',              b:35,   c:'--acid', d:'NASA + the National Science Foundation, combined', sliver:true},
   {k:'park', nm:'Parks, wildlife & public land',b:34,   c:'--acid', d:'national parks, forests, fish & wildlife', sliver:true},
