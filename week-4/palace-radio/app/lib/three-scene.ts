@@ -11,6 +11,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import type { BeaconNode } from './nodes'
+import { buildGlyph } from './glyphs'
 
 export type SceneAPI = {
   setActive: (index: number | null) => void
@@ -131,8 +132,9 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
   scene.add(ring)
 
   const beaconGroup = new THREE.Group()
-  const beaconMeshes: THREE.Mesh[] = []
-  const coreMats: THREE.MeshBasicMaterial[] = []
+  const pulseGroups: THREE.Group[] = []
+  const hitMeshes: THREE.Mesh[] = []
+  const glyphMats: THREE.MeshBasicMaterial[] = []
   const glowSprites: THREE.Sprite[] = []
   const labelSprites: THREE.Sprite[] = []
   const labelMats: THREE.SpriteMaterial[] = []
@@ -140,13 +142,26 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
 
   nodes.forEach((node) => {
     const [x, y, z] = node.position
-    const coreMat = new THREE.MeshBasicMaterial({ color: AMBER })
-    const core = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), coreMat)
-    core.position.set(x, y + 1.3, z)
-    core.userData.locusIndex = node.index
-    beaconGroup.add(core)
-    beaconMeshes.push(core)
-    coreMats.push(coreMat)
+
+    // pulseGroup holds the recognizable glyph + its click target, so both
+    // breathe together; the glow halo and label stay independently stable.
+    const pulseGroup = new THREE.Group()
+    pulseGroup.position.set(x, y + 1.3, z)
+    beaconGroup.add(pulseGroup)
+    pulseGroups.push(pulseGroup)
+
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 10, 10),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+    )
+    hit.userData.locusIndex = node.index
+    pulseGroup.add(hit)
+    hitMeshes.push(hit)
+
+    const { group: glyph, material: glyphMat } = buildGlyph(node.locus, AMBER)
+    glyph.scale.setScalar(0.95)
+    pulseGroup.add(glyph)
+    glyphMats.push(glyphMat)
 
     const pylon = new THREE.Mesh(
       new THREE.CylinderGeometry(0.02, 0.02, 2.4, 8),
@@ -159,12 +174,12 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
       map: tex,
       color: AMBER,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.35,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
     const sprite = new THREE.Sprite(spriteMat)
-    sprite.scale.set(1.7, 1.7, 1)
+    sprite.scale.set(0.85, 0.85, 1)
     sprite.position.set(x, y + 1.3, z)
     beaconGroup.add(sprite)
     glowSprites.push(sprite)
@@ -207,7 +222,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
 
   const composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))
-  const bloom = new UnrealBloomPass(new THREE.Vector2(canvas.clientWidth, canvas.clientHeight), 0.9, 0.6, 0.15)
+  const bloom = new UnrealBloomPass(new THREE.Vector2(canvas.clientWidth, canvas.clientHeight), 0.55, 0.45, 0.25)
   composer.addPass(bloom)
 
   let activeIndex: number | null = null
@@ -246,7 +261,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
       -((clientY - rect.top) / rect.height) * 2 + 1
     )
     raycaster.setFromCamera(ndc, camera)
-    const hits = raycaster.intersectObjects(beaconMeshes, false)
+    const hits = raycaster.intersectObjects(hitMeshes, false)
     if (!hits.length) return null
     return (hits[0].object.userData.locusIndex as number) ?? null
   }
@@ -257,13 +272,13 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
     raf = requestAnimationFrame(animate)
     const t = clock.getElapsedTime()
 
-    beaconMeshes.forEach((mesh, i) => {
+    pulseGroups.forEach((grp, i) => {
       const isActive = i === activeIndex
       const pulse = isActive ? 1 + 0.25 * Math.sin(t * 6) : 1 + 0.05 * Math.sin(t * 1.4 + i)
-      mesh.scale.setScalar(pulse)
-      coreMats[i].color.copy(isActive ? TEAL : AMBER)
+      grp.scale.setScalar(pulse)
+      glyphMats[i].color.copy(isActive ? TEAL : AMBER)
       glowSprites[i].material.color.copy(isActive ? TEAL : AMBER)
-      glowSprites[i].scale.setScalar(isActive ? 2.5 : 1.7)
+      glowSprites[i].scale.setScalar(isActive ? 1.3 : 0.85)
       labelMats[i].color.copy(isActive ? TEAL : AMBER)
     })
 
@@ -297,6 +312,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
     renderer.dispose()
     labelMats.forEach((m) => m.dispose())
     labelTextures.forEach((t) => t.dispose())
+    glyphMats.forEach((m) => m.dispose())
     dustGeo.dispose()
     dustMat.dispose()
     tex.dispose()
