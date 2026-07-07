@@ -11,13 +11,13 @@
  * game," the same way Kyle's/Eric's 3D builds read as solid rooms.
  */
 import * as THREE from 'three'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import type { BeaconNode } from './nodes'
 import { ROOM } from './nodes'
 import { buildGlyph } from './glyphs'
+import { createWalkControls } from './walk-controls'
 
 export type SceneAPI = {
   setActive: (index: number | null) => void
@@ -112,7 +112,7 @@ function labelTexture(text: string): { texture: THREE.Texture; aspect: number } 
   return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height }
 }
 
-export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): SceneAPI {
+export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPick?: (index: number) => void): SceneAPI {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
@@ -120,18 +120,29 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#050607')
-  scene.fog = new THREE.FogExp2(0x050607, 0.032)
+  scene.fog = new THREE.FogExp2(0x050607, 0.055)
 
-  const camera = new THREE.PerspectiveCamera(48, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200)
-  camera.position.set(0, 7.5, 9.5)
+  const camera = new THREE.PerspectiveCamera(62, canvas.clientWidth / Math.max(canvas.clientHeight, 1), 0.1, 200)
 
-  const controls = new OrbitControls(camera, renderer.domElement)
-  controls.enableDamping = true
-  controls.dampingFactor = 0.07
-  controls.minDistance = 3.5
-  controls.maxDistance = 15
-  controls.maxPolarAngle = Math.PI * 0.49
-  controls.target.set(0, 1, 0)
+  const EYE_HEIGHT = 1.6
+  const walker = createWalkControls(camera, renderer.domElement, {
+    eyeHeight: EYE_HEIGHT,
+    bounds: { halfWidth: ROOM.width / 2, halfDepth: ROOM.depth / 2, margin: 0.55 },
+    collisions: nodes.map((n) => ({ x: n.position[0], z: n.position[2], radius: 0.9 })),
+    spawn: { x: 0, z: ROOM.depth / 2 - 1.7, yaw: Math.PI },
+    onClick: (clientX, clientY) => {
+      const idx = pickAt(clientX, clientY)
+      if (idx !== null) onPick?.(idx)
+    },
+  })
+
+  // Debug hook: the preview harness runs this tab hidden, which fully pauses
+  // requestAnimationFrame — so movement can't be verified by waiting in real
+  // time. Exposes manual frame-stepping instead (same convention as our other
+  // builds' window.__ headless harnesses).
+  if (typeof window !== 'undefined') {
+    ;(window as any).__palaceScene = { camera, walker, ROOM }
+  }
 
   const tex = glowTexture()
 
@@ -293,25 +304,32 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
   let flyStart = 0
   let flyDuration = 1200
   const flyFromPos = new THREE.Vector3()
-  const flyFromTarget = new THREE.Vector3()
+  const flyFromLook = new THREE.Vector3()
+  const currentLook = new THREE.Vector3()
 
   function setActive(index: number | null) {
     activeIndex = index
   }
 
+  /** Scripted camera moves (Palace Radio's flythrough, and clicking a locus in
+   * the side panel) temporarily take over from the walker, then hand control
+   * back with yaw/pitch synced so manual walking resumes without a snap. */
   function flyTo(index: number | null, durationMs = 1300) {
+    walker.setEnabled(false)
     flyFromPos.copy(camera.position)
-    flyFromTarget.copy(controls.target)
+    const dir = new THREE.Vector3()
+    camera.getWorldDirection(dir)
+    flyFromLook.copy(camera.position).addScaledVector(dir, 3)
     flyStart = performance.now()
     flyDuration = durationMs
     if (index === null || !nodes[index]) {
-      flyTarget = new THREE.Vector3(0, 7.5, 9.5)
-      flyLookAt = new THREE.Vector3(0, 1, 0)
+      flyTarget = new THREE.Vector3(0, EYE_HEIGHT, 2.4)
+      flyLookAt = core.position.clone()
     } else {
       const [x, , z] = nodes[index].position
-      const dir = new THREE.Vector2(x, z).normalize()
+      const d = new THREE.Vector2(x, z).normalize()
       // move IN from the furniture toward the room center (not out through the wall)
-      flyTarget = new THREE.Vector3(x - dir.x * 2.6, 2.0, z - dir.y * 2.6)
+      flyTarget = new THREE.Vector3(x - d.x * 1.9, EYE_HEIGHT, z - d.y * 1.9)
       flyLookAt = new THREE.Vector3(x, 0.7, z)
     }
   }
@@ -333,7 +351,8 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
   const clock = new THREE.Clock()
   function animate() {
     raf = requestAnimationFrame(animate)
-    const t = clock.getElapsedTime()
+    const dt = Math.min(clock.getDelta(), 0.05)
+    const t = clock.elapsedTime
 
     core.rotation.y = t * 0.4
     core.rotation.x = t * 0.15
@@ -358,11 +377,17 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
       const p = Math.min(1, elapsed / flyDuration)
       const ease = 1 - Math.pow(1 - p, 3)
       camera.position.lerpVectors(flyFromPos, flyTarget, ease)
-      controls.target.lerpVectors(flyFromTarget, flyLookAt, ease)
-      if (p >= 1) flyTarget = null
+      currentLook.lerpVectors(flyFromLook, flyLookAt, ease)
+      camera.lookAt(currentLook)
+      if (p >= 1) {
+        walker.setLookAt(flyTarget, flyLookAt)
+        walker.setEnabled(true)
+        flyTarget = null
+      }
+    } else {
+      walker.update(dt)
     }
 
-    controls.update()
     composer.render()
   }
   animate()
@@ -379,7 +404,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
 
   function dispose() {
     cancelAnimationFrame(raf)
-    controls.dispose()
+    walker.dispose()
     renderer.dispose()
     labelMats.forEach((m) => m.dispose())
     labelTextures.forEach((t) => t.dispose())
@@ -387,6 +412,11 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
     floorTex.dispose()
     wallTex.dispose()
     tex.dispose()
+  }
+
+  if (typeof window !== 'undefined') {
+    ;(window as any).__palaceScene.pickAt = pickAt
+    ;(window as any).__palaceScene.hitMeshes = hitMeshes
   }
 
   return { setActive, flyTo, pickAt, resize, dispose }

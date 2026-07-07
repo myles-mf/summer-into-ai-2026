@@ -67,7 +67,7 @@ export default function PalacePage() {
           </Link>
         </div>
         <div className="absolute bottom-4 left-4 text-[10px] uppercase tracking-widest text-[var(--fg-dim)]">
-          drag to orbit · click a beacon
+          WASD to walk · drag to look · click a beacon
         </div>
       </div>
 

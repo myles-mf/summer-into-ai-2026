@@ -80,7 +80,7 @@ export default function HomePage() {
                 in a 3D station — with a vivid, easy-to-recall association.
               </li>
               <li>
-                <b className="text-[var(--paper)]">Explore</b> the station: drag to orbit, click a beacon to see (and hear) what's there.
+                <b className="text-[var(--paper)]">Explore</b> the station: WASD to walk, drag to look around, click a beacon to see (and hear) what's there.
               </li>
               <li>
                 <b className="text-[var(--paper)]">Tune in to Palace Radio</b>: a real voice — the Keeper — walks the ring in order.

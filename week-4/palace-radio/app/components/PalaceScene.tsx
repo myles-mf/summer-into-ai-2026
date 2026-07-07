@@ -14,12 +14,16 @@ const PalaceScene = forwardRef<PalaceSceneHandle, { nodes: BeaconNode[]; onPick?
 
     useEffect(() => {
       if (!canvasRef.current || nodes.length === 0) return
-      const api = createScene(canvasRef.current, nodes)
+      const api = createScene(canvasRef.current, nodes, onPick)
       apiRef.current = api
-      const onResize = () => api.resize()
-      window.addEventListener('resize', onResize)
+      // ResizeObserver (not a window 'resize' listener) so the camera's
+      // aspect ratio is corrected the moment the canvas gets its real
+      // flex-layout size, not just on browser window resizes — otherwise
+      // the camera can be stuck with the 0x0 size it briefly had at mount.
+      const ro = new ResizeObserver(() => api.resize())
+      ro.observe(canvasRef.current)
       return () => {
-        window.removeEventListener('resize', onResize)
+        ro.disconnect()
         api.dispose()
         apiRef.current = null
       }
@@ -38,16 +42,7 @@ const PalaceScene = forwardRef<PalaceSceneHandle, { nodes: BeaconNode[]; onPick?
       []
     )
 
-    return (
-      <canvas
-        ref={canvasRef}
-        className="block h-full w-full cursor-grab active:cursor-grabbing"
-        onClick={(e) => {
-          const idx = apiRef.current?.pickAt(e.clientX, e.clientY)
-          if (idx !== null && idx !== undefined) onPick?.(idx)
-        }}
-      />
-    )
+    return <canvas ref={canvasRef} className="block h-full w-full cursor-crosshair" />
   }
 )
 
