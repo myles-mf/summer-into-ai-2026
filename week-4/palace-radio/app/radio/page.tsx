@@ -1,0 +1,266 @@
+'use client'
+
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import PalaceScene, { type PalaceSceneHandle } from '../components/PalaceScene'
+import { loadPalace, savePalace, type PalaceState, type Association } from '../lib/palace'
+import { layoutRing } from '../lib/nodes'
+import { encodeBroadcast, type DecoderEntry } from '../lib/cipher'
+import { decodeLines, playSequence, stitchToWav, downloadBlob, type PlaybackHandle } from '../lib/audio-engine'
+
+type Mode = 'plain' | 'cipher'
+type Phase = 'idle' | 'tuning' | 'playing' | 'done'
+
+const INTRO = "Transmission opening. This is the Keeper. Let's walk the ring."
+const OUTRO = "That's the last beacon. Transmission complete."
+
+function buildScript(associations: Association[], mode: Mode) {
+  if (mode === 'cipher') {
+    const { spoken, decoder } = encodeBroadcast(associations)
+    const lineNode: (number | null)[] = [null, ...associations.map((_, i) => i), null]
+    return { spoken, decoder, lineNode }
+  }
+  const spoken = [INTRO, ...associations.map((a) => `At the ${a.locus}. ${a.sentence}.`), OUTRO]
+  const lineNode: (number | null)[] = [null, ...associations.map((_, i) => i), null]
+  return { spoken, decoder: [] as DecoderEntry[], lineNode }
+}
+
+function RadioContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [palace, setPalace] = useState<PalaceState | null>(null)
+  const [mode, setMode] = useState<Mode>('plain')
+  const [spatial, setSpatial] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [progress, setProgress] = useState({ done: 0, total: 0 })
+  const [lineIndex, setLineIndex] = useState(-1)
+  const [decoderOpen, setDecoderOpen] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  const sceneRef = useRef<PalaceSceneHandle>(null)
+  const playbackRef = useRef<PlaybackHandle | null>(null)
+  const buffersRef = useRef<AudioBuffer[]>([])
+
+  useEffect(() => {
+    const encoded = searchParams.get('p')
+    if (encoded) {
+      try {
+        const json = atob(decodeURIComponent(encoded))
+        const data = JSON.parse(json) as { associations: Association[]; loci: string[] }
+        if (data.associations?.length && data.loci?.length) {
+          savePalace({ associations: data.associations, loci: data.loci })
+          setPalace(loadPalace())
+          setMode(searchParams.get('mode') === 'cipher' ? 'cipher' : 'plain')
+          return
+        }
+      } catch (_) {
+        /* invalid payload, fall through */
+      }
+    }
+    const p = loadPalace()
+    if (!p || !p.associations.length) {
+      router.replace('/create')
+      return
+    }
+    setPalace(p)
+  }, [router, searchParams])
+
+  const nodes = useMemo(() => (palace ? layoutRing(palace.loci) : []), [palace])
+  const script = useMemo(() => (palace ? buildScript(palace.associations, mode) : null), [palace, mode])
+
+  async function startBroadcast() {
+    if (!palace || !script) return
+    setError(null)
+    setPhase('tuning')
+    setProgress({ done: 0, total: script.spoken.length })
+    try {
+      const buffers = await decodeLines(script.spoken, (done, total) => setProgress({ done, total }))
+      buffersRef.current = buffers
+      setPhase('playing')
+      const cues = script.lineNode.map((nodeIdx) => ({
+        position: nodeIdx === null ? ([0, 1, 0] as [number, number, number]) : nodes[nodeIdx].position,
+      }))
+      playbackRef.current = playSequence(buffers, cues, {
+        spatial,
+        onLineStart: (i) => {
+          setLineIndex(i)
+          const nodeIdx = script.lineNode[i]
+          sceneRef.current?.setActive(nodeIdx)
+          sceneRef.current?.flyTo(nodeIdx)
+        },
+        onDone: () => {
+          setPhase('done')
+          setLineIndex(-1)
+          sceneRef.current?.setActive(null)
+          sceneRef.current?.flyTo(null)
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The signal could not be reached')
+      setPhase('idle')
+    }
+  }
+
+  function stopBroadcast() {
+    playbackRef.current?.stop()
+    setPhase('idle')
+    setLineIndex(-1)
+    sceneRef.current?.setActive(null)
+    sceneRef.current?.flyTo(null)
+  }
+
+  function downloadBroadcast() {
+    if (!buffersRef.current.length) return
+    const blob = stitchToWav(buffersRef.current)
+    downloadBlob(blob, `palace-radio-broadcast.wav`)
+  }
+
+  function copyBroadcastLink() {
+    if (!palace) return
+    const payload = { associations: palace.associations, loci: palace.loci }
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
+    let url = `${window.location.origin}/radio?p=${encodeURIComponent(encoded)}`
+    if (mode === 'cipher') url += '&mode=cipher'
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    })
+  }
+
+  if (!palace || !script) {
+    return <main className="min-h-screen flex items-center justify-center text-[var(--fg-dim)]">Tuning…</main>
+  }
+
+  return (
+    <main className="min-h-screen flex flex-col md:flex-row">
+      <div className="relative h-[52vh] md:h-screen flex-1">
+        <PalaceScene ref={sceneRef} nodes={nodes} />
+        <div className="absolute top-4 left-4">
+          <Link href="/" className="text-xs text-[var(--fg-dim)] hover:text-[var(--amber)]">
+            ← Palace Radio
+          </Link>
+        </div>
+        {lineIndex >= 0 && (
+          <div className="absolute bottom-4 left-4 right-4 panel crt px-4 py-3 max-w-xl">
+            <p className="text-xs uppercase tracking-widest text-[var(--teal)]">on air</p>
+            <p className="mt-1 text-sm">{script.spoken[lineIndex]}</p>
+          </div>
+        )}
+      </div>
+
+      <aside className="panel crt w-full md:w-96 p-6 flex flex-col">
+        <span className="kicker">Palace Radio</span>
+        <h1 className="headline text-2xl mt-3">On the Air</h1>
+        <p className="mt-1 text-sm text-[var(--fg-dim)]">
+          One broadcast: the Keeper walks every beacon in order, in a real voice — downloadable, shareable.
+        </p>
+
+        <div className="mt-5 flex items-center gap-3">
+          <div className="flex border border-[var(--line)]">
+            {(['plain', 'cipher'] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                disabled={phase !== 'idle'}
+                onClick={() => setMode(m)}
+                className={`px-3 py-1.5 text-xs uppercase tracking-wide ${mode === m ? 'bg-[var(--amber)] text-[var(--void)]' : 'text-[var(--fg-dim)]'}`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-[var(--fg-dim)]">
+            <input type="checkbox" checked={spatial} onChange={(e) => setSpatial(e.target.checked)} disabled={phase !== 'idle'} />
+            spatial (headphones)
+          </label>
+        </div>
+
+        <div className="mt-6">
+          {phase === 'idle' && (
+            <button type="button" onClick={startBroadcast} className="btn w-full">
+              ▸ Start Palace Radio
+            </button>
+          )}
+          {phase === 'tuning' && (
+            <p className="text-sm text-[var(--teal)]">tuning in… {progress.done}/{progress.total}</p>
+          )}
+          {phase === 'playing' && (
+            <button type="button" onClick={stopBroadcast} className="btn btn--ghost w-full">
+              ■ Stop
+            </button>
+          )}
+          {phase === 'done' && (
+            <div className="space-y-2">
+              <p className="text-sm text-[var(--amber)]">Transmission complete.</p>
+              <button type="button" onClick={startBroadcast} className="btn w-full">
+                ▸ Play again
+              </button>
+            </div>
+          )}
+          {error && <p className="mt-2 text-xs text-[var(--redact)]">{error}</p>}
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-[var(--line)] space-y-2">
+          <button
+            type="button"
+            onClick={downloadBroadcast}
+            disabled={!buffersRef.current.length}
+            className="btn btn--teal w-full !text-xs"
+          >
+            ⬇ Download broadcast (.wav)
+          </button>
+          <button type="button" onClick={copyBroadcastLink} className="btn btn--ghost w-full !text-xs">
+            {linkCopied ? 'Copied!' : 'Copy broadcast link'}
+          </button>
+        </div>
+
+        {mode === 'cipher' && script.decoder.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-[var(--line)]">
+            <button type="button" onClick={() => setDecoderOpen(!decoderOpen)} className="text-xs text-[var(--amber)]">
+              {decoderOpen ? '▼' : '▶'} decoder
+            </button>
+            {decoderOpen && (
+              <table className="mt-2 w-full text-xs">
+                <thead>
+                  <tr className="text-[var(--fg-dim)] text-left">
+                    <th className="pb-1">code</th>
+                    <th className="pb-1">locus</th>
+                    <th className="pb-1">item</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {script.decoder.map((d, i) => (
+                    <tr key={i} className="border-t border-[var(--line)]">
+                      <td className="py-1 text-[var(--amber)]">{d.code}</td>
+                      <td className="py-1 text-[var(--fg-dim)]">{d.locus}</td>
+                      <td className="py-1">{d.item}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        <div className="mt-auto pt-6 flex gap-2">
+          <Link href="/palace" className="btn btn--ghost !text-xs">
+            Explore
+          </Link>
+          <Link href="/quiz" className="btn btn--ghost !text-xs">
+            Quiz
+          </Link>
+        </div>
+      </aside>
+    </main>
+  )
+}
+
+export default function RadioPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-[var(--fg-dim)]">Tuning…</main>}>
+      <RadioContent />
+    </Suspense>
+  )
+}
