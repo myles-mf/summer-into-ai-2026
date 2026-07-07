@@ -37,6 +37,45 @@ function glowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas)
 }
 
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+/** A small floating call-sign chip so each beacon reads as "what it is" at a
+ * glance, not just an interchangeable glowing ball — drawn in white so it can
+ * be tinted (amber/teal) the same way the glow sprite is, via material.color. */
+function labelTexture(text: string): { texture: THREE.Texture; aspect: number } {
+  const dpr = 2
+  const fontSize = 40 * dpr
+  const padX = 26 * dpr
+  const padY = 16 * dpr
+  const measure = document.createElement('canvas').getContext('2d')!
+  measure.font = `700 ${fontSize}px "JetBrains Mono", monospace`
+  const textW = measure.measureText(text.toUpperCase()).width
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.ceil(textW + padX * 2)
+  canvas.height = Math.ceil(fontSize + padY * 2)
+  const ctx = canvas.getContext('2d')!
+  ctx.font = `700 ${fontSize}px "JetBrains Mono", monospace`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  roundRectPath(ctx, 2, 2, canvas.width - 4, canvas.height - 4, 10 * dpr)
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'
+  ctx.fill()
+  ctx.lineWidth = 3 * dpr
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+  ctx.stroke()
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText(text.toUpperCase(), canvas.width / 2, canvas.height / 2 + 2 * dpr)
+  return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height }
+}
+
 export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): SceneAPI {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
@@ -95,6 +134,9 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
   const beaconMeshes: THREE.Mesh[] = []
   const coreMats: THREE.MeshBasicMaterial[] = []
   const glowSprites: THREE.Sprite[] = []
+  const labelSprites: THREE.Sprite[] = []
+  const labelMats: THREE.SpriteMaterial[] = []
+  const labelTextures: THREE.Texture[] = []
 
   nodes.forEach((node) => {
     const [x, y, z] = node.position
@@ -126,6 +168,23 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
     sprite.position.set(x, y + 1.3, z)
     beaconGroup.add(sprite)
     glowSprites.push(sprite)
+
+    const { texture: labelTex, aspect } = labelTexture(node.locus)
+    const labelMat = new THREE.SpriteMaterial({
+      map: labelTex,
+      color: AMBER,
+      transparent: true,
+      depthTest: false,
+    })
+    const labelHeight = 0.62
+    const label = new THREE.Sprite(labelMat)
+    label.scale.set(labelHeight * aspect, labelHeight, 1)
+    label.position.set(x, y + 1.3 + 0.85, z)
+    label.renderOrder = 10
+    beaconGroup.add(label)
+    labelSprites.push(label)
+    labelMats.push(labelMat)
+    labelTextures.push(labelTex)
   })
   scene.add(beaconGroup)
 
@@ -205,6 +264,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
       coreMats[i].color.copy(isActive ? TEAL : AMBER)
       glowSprites[i].material.color.copy(isActive ? TEAL : AMBER)
       glowSprites[i].scale.setScalar(isActive ? 2.5 : 1.7)
+      labelMats[i].color.copy(isActive ? TEAL : AMBER)
     })
 
     if (flyTarget && flyLookAt) {
@@ -235,6 +295,8 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[]): Sce
     cancelAnimationFrame(raf)
     controls.dispose()
     renderer.dispose()
+    labelMats.forEach((m) => m.dispose())
+    labelTextures.forEach((t) => t.dispose())
     dustGeo.dispose()
     dustMat.dispose()
     tex.dispose()
