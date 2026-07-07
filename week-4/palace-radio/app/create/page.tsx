@@ -101,7 +101,7 @@ export default function CreatePage() {
             <button type="button" onClick={chooseTemplate} className="panel crt p-6 text-left hover:border-[var(--amber)] transition">
               <span className="font-bold text-[var(--amber)]">Template station</span>
               <p className="mt-2 text-sm text-[var(--fg-dim)]">
-                Five beacons: door, desk, window, bed, shelf. Instant — try it in under a minute.
+                Ten beacons around a full room: door, desk, window, bed, shelf, chair, lamp, bookshelf, mirror, table. Instant — try it in under a minute.
               </p>
             </button>
             <div className="panel crt p-6">

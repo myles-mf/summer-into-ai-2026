@@ -88,7 +88,10 @@ const GLYPH_BUILDERS: Record<string, PartBuilder> = {
     shade.position.set(0, 0.27, 0)
     return [base, pole, shade]
   },
-  mirror: (mat) => [new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.032, 10, 28), mat)],
+  mirror: (mat) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.032, 10, 28), mat)
+    return [ring]
+  },
 }
 
 const ALIASES: Record<string, string> = {

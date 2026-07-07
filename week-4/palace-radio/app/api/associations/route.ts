@@ -1,9 +1,9 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimited, sameOrigin, clientIp } from '@/app/lib/api-guard'
+import { TEMPLATE_LOCI } from '@/app/lib/palace'
 
-const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS ?? '512', 10)
-const TEMPLATE_LOCI = ['door', 'desk', 'window', 'bed', 'shelf']
+const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS ?? '700', 10)
 
 export async function POST(req: NextRequest) {
   if (!sameOrigin(req)) return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 })
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const topicOrList = body.topicOrList?.trim()
-  const loci = (body.loci?.length ? body.loci : TEMPLATE_LOCI).slice(0, 8)
+  const loci = (body.loci?.length ? body.loci : TEMPLATE_LOCI).slice(0, 10)
   if (!topicOrList) return NextResponse.json({ error: 'topicOrList is required' }, { status: 400 })
 
   const openai = new OpenAI({ apiKey })

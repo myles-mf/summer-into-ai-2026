@@ -141,7 +141,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   // time. Exposes manual frame-stepping instead (same convention as our other
   // builds' window.__ headless harnesses).
   if (typeof window !== 'undefined') {
-    ;(window as any).__palaceScene = { camera, walker, ROOM }
+    ;(window as any).__palaceScene = { camera, walker, ROOM, scene }
   }
 
   const tex = glowTexture()

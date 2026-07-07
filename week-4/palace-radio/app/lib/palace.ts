@@ -3,7 +3,18 @@
  * model's read of an uploaded room photo; the photo itself (if any) is kept
  * only as a soft backdrop texture behind the 3D beacon ring, never pinned to.
  */
-export const TEMPLATE_LOCI = ['door', 'desk', 'window', 'bed', 'shelf'] as const
+export const TEMPLATE_LOCI = [
+  'door',
+  'desk',
+  'window',
+  'bed',
+  'shelf',
+  'chair',
+  'lamp',
+  'bookshelf',
+  'mirror',
+  'table',
+] as const
 
 export type Association = { locus: string; item: string; sentence: string }
 
