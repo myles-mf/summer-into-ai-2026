@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import PalaceScene, { type PalaceSceneHandle } from '../components/PalaceScene'
 import { loadPalace, savePalace, type PalaceState, type Association } from '../lib/palace'
-import { layoutRing } from '../lib/nodes'
+import { layoutRoom } from '../lib/nodes'
 import { encodeBroadcast, type DecoderEntry } from '../lib/cipher'
 import { decodeLines, playSequence, stitchToWav, downloadBlob, type PlaybackHandle } from '../lib/audio-engine'
 
@@ -67,7 +67,7 @@ function RadioContent() {
     setPalace(p)
   }, [router, searchParams])
 
-  const nodes = useMemo(() => (palace ? layoutRing(palace.loci) : []), [palace])
+  const nodes = useMemo(() => (palace ? layoutRoom(palace.loci) : []), [palace])
   const script = useMemo(() => (palace ? buildScript(palace.associations, mode) : null), [palace, mode])
 
   async function startBroadcast() {

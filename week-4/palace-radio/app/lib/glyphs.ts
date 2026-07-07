@@ -9,9 +9,9 @@
  */
 import * as THREE from 'three'
 
-type PartBuilder = (mat: THREE.MeshBasicMaterial) => THREE.Object3D[]
+type PartBuilder = (mat: THREE.MeshStandardMaterial) => THREE.Object3D[]
 
-function bar(mat: THREE.MeshBasicMaterial, w: number, h: number, d: number, x = 0, y = 0, z = 0) {
+function bar(mat: THREE.MeshStandardMaterial, w: number, h: number, d: number, x = 0, y = 0, z = 0) {
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
   mesh.position.set(x, y, z)
   return mesh
@@ -109,14 +109,20 @@ const ALIASES: Record<string, string> = {
   picture: 'mirror',
 }
 
-function fallbackGlyph(mat: THREE.MeshBasicMaterial): THREE.Object3D[] {
+function fallbackGlyph(mat: THREE.MeshStandardMaterial): THREE.Object3D[] {
   return [new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), mat)]
 }
 
-export type GlyphResult = { group: THREE.Group; material: THREE.MeshBasicMaterial }
+export type GlyphResult = { group: THREE.Group; material: THREE.MeshStandardMaterial }
 
 export function buildGlyph(locus: string, initialColor: THREE.Color): GlyphResult {
-  const material = new THREE.MeshBasicMaterial({ color: initialColor })
+  const material = new THREE.MeshStandardMaterial({
+    color: initialColor,
+    emissive: initialColor,
+    emissiveIntensity: 0.55,
+    roughness: 0.35,
+    metalness: 0.55,
+  })
   const key = locus.toLowerCase().trim()
   const resolved = GLYPH_BUILDERS[key] ? key : ALIASES[key]
   const builder = resolved ? GLYPH_BUILDERS[resolved] : undefined

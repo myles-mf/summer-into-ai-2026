@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import PalaceScene, { type PalaceSceneHandle } from '../components/PalaceScene'
 import { loadPalace, type PalaceState } from '../lib/palace'
-import { layoutRing } from '../lib/nodes'
+import { layoutRoom } from '../lib/nodes'
 import { decodeLine, playSequence, type PlaybackHandle } from '../lib/audio-engine'
 
 export default function PalacePage() {
@@ -26,7 +26,7 @@ export default function PalacePage() {
     setPalace(p)
   }, [router])
 
-  const nodes = useMemo(() => (palace ? layoutRing(palace.loci) : []), [palace])
+  const nodes = useMemo(() => (palace ? layoutRoom(palace.loci) : []), [palace])
 
   function select(index: number) {
     setSelected(index)
