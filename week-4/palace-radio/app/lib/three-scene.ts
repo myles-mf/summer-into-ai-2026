@@ -1,12 +1,17 @@
 /**
- * The Signal Station: an actual enclosed room (floor + holographic walls),
- * not a ring of icons floating in open space. Furniture sits on the floor
- * around the walls — real Kenney "Furniture Kit" models (CC0, public/models/,
- * loaded async via GLTFLoader) for anything in our curated vocabulary, with
- * an abstract wireframe crystal fallback for anything outside it (an
- * uploaded room photo can return an open-ended word we don't have a model
- * for). A glowing wireframe transmitter core hovers at the room's center,
- * wired to every piece of furniture by signal arcs.
+ * The Signal Station: an open holographic data-floor, not a boxed-in room
+ * and not a ring of icons floating in undefined space — a lit grid floor
+ * grounds everything, furniture is arranged in a room-shaped layout, but
+ * there are no wall planes (tried enclosing walls first; an open grid read
+ * as cleaner and more "sci-fi data-space" than a boxed room, with less
+ * visual noise competing with the furniture). Furniture is real Kenney
+ * "Furniture Kit" models (CC0, public/models/, loaded async via GLTFLoader)
+ * for anything in our curated vocabulary, with an abstract wireframe crystal
+ * fallback for anything outside it (an uploaded room photo can return an
+ * open-ended word we don't have a model for). A glowing wireframe
+ * transmitter core hovers at the room's center, wired to every piece of
+ * furniture by signal arcs. Walking bounds are still invisible-only, set
+ * directly from ROOM in the walker config, independent of any wall visuals.
  */
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -154,31 +159,8 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
 
-  const wallTex = gridTexture(8, 'rgba(255,176,32,0.35)', '#080b0c')
-  function makeWall(w: number, h: number, x: number, z: number, rotY: number) {
-    const t = wallTex.clone()
-    t.needsUpdate = true
-    t.repeat.set(w / 2, h / 2)
-    const wall = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshStandardMaterial({
-        map: t,
-        transparent: true,
-        opacity: 0.22,
-        side: THREE.DoubleSide,
-        roughness: 1,
-        emissive: 0x0a0f10,
-      })
-    )
-    wall.position.set(x, h / 2, z)
-    wall.rotation.y = rotY
-    scene.add(wall)
-    return wall
-  }
-  makeWall(ROOM.width, ROOM.height, 0, -ROOM.depth / 2, 0)
-  makeWall(ROOM.width, ROOM.height, 0, ROOM.depth / 2, Math.PI)
-  makeWall(ROOM.depth, ROOM.height, -ROOM.width / 2, 0, Math.PI / 2)
-  makeWall(ROOM.depth, ROOM.height, ROOM.width / 2, 0, -Math.PI / 2)
+  // No wall meshes by design — see the file header. The walker's invisible
+  // play-area bounds (below) still keep you from walking into the void.
 
   // --- lighting: real shading, not flat unlit color ---
   scene.add(new THREE.HemisphereLight(0x2b3a3d, 0x0a0a0d, 0.9))
@@ -424,7 +406,6 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     labelMats.forEach((m) => m.dispose())
     labelTextures.forEach((t) => t.dispose())
     floorTex.dispose()
-    wallTex.dispose()
     tex.dispose()
   }
 
