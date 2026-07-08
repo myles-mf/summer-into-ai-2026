@@ -1,14 +1,12 @@
 /**
  * The Signal Station: an actual enclosed room (floor + holographic walls),
  * not a ring of icons floating in open space. Furniture sits on the floor
- * around the walls, lit + shaded (MeshStandardMaterial, real lights) instead
- * of flat unlit color, with a small emissive glow so it still reads through
- * bloom. A glowing transmitter core hovers at the room's center, wired to
- * every piece of furniture by signal arcs — the room's actual broadcast
- * device. Deliberately still hand-authored primitives (no AI 3D-asset
- * generation, no external model pack) so it stays a single dependency-free
- * file, but real lighting + shading gets most of the way to "looks like a
- * game," the same way Kyle's/Eric's 3D builds read as solid rooms.
+ * around the walls — real Kenney "Furniture Kit" models (CC0, public/models/,
+ * loaded async via GLTFLoader) for anything in our curated vocabulary, with
+ * an abstract wireframe crystal fallback for anything outside it (an
+ * uploaded room photo can return an open-ended word we don't have a model
+ * for). A glowing wireframe transmitter core hovers at the room's center,
+ * wired to every piece of furniture by signal arcs.
  */
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -16,7 +14,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import type { BeaconNode } from './nodes'
 import { ROOM } from './nodes'
-import { buildGlyph } from './glyphs'
+import { loadFurnitureModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
 
 export type SceneAPI = {
@@ -128,7 +126,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   const walker = createWalkControls(camera, renderer.domElement, {
     eyeHeight: EYE_HEIGHT,
     bounds: { halfWidth: ROOM.width / 2, halfDepth: ROOM.depth / 2, margin: 0.55 },
-    collisions: nodes.map((n) => ({ x: n.position[0], z: n.position[2], radius: 0.9 })),
+    collisions: nodes.map((n) => ({ x: n.position[0], z: n.position[2], radius: 1.0 })),
     spawn: { x: 0, z: ROOM.depth / 2 - 1.7, yaw: Math.PI },
     onClick: (clientX, clientY) => {
       const idx = pickAt(clientX, clientY)
@@ -195,34 +193,53 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   const beaconGroup = new THREE.Group()
   const pulseGroups: THREE.Group[] = []
   const hitMeshes: THREE.Mesh[] = []
-  const glyphMats: THREE.MeshStandardMaterial[] = []
   const glowSprites: THREE.Sprite[] = []
   const labelSprites: THREE.Sprite[] = []
   const labelMats: THREE.SpriteMaterial[] = []
   const labelTextures: THREE.Texture[] = []
 
+  function fallbackCrystal(): THREE.Object3D {
+    return new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.4, 0),
+      new THREE.MeshStandardMaterial({ color: AMBER, emissive: AMBER, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.55 })
+    )
+  }
+
   nodes.forEach((node) => {
     const [x, , z] = node.position
 
+    // real models are grounded to y=0 (model-glyph.ts normalizes them), so
+    // the whole beacon sits at floor level now, not head height.
     const pulseGroup = new THREE.Group()
-    pulseGroup.position.set(x, 0.42, z)
-    // face the furniture toward the room center
-    pulseGroup.lookAt(0, 0.42, 0)
+    pulseGroup.position.set(x, 0, z)
+    pulseGroup.lookAt(0, 0, 0) // face the room center
     beaconGroup.add(pulseGroup)
     pulseGroups.push(pulseGroup)
 
     const hit = new THREE.Mesh(
-      new THREE.SphereGeometry(0.55, 10, 10),
+      new THREE.SphereGeometry(0.65, 10, 10),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
     )
+    hit.position.y = 0.55
     hit.userData.locusIndex = node.index
     pulseGroup.add(hit)
     hitMeshes.push(hit)
 
-    const { group: glyph, material: glyphMat } = buildGlyph(node.locus, AMBER)
-    glyph.scale.setScalar(0.95)
-    pulseGroup.add(glyph)
-    glyphMats.push(glyphMat)
+    // lightweight placeholder shown while the real model streams in
+    const placeholder = fallbackCrystal()
+    placeholder.position.y = 0.5
+    placeholder.scale.setScalar(0.6)
+    pulseGroup.add(placeholder)
+
+    loadFurnitureModel(node.locus)
+      .then((model) => {
+        pulseGroup.remove(placeholder)
+        pulseGroup.add(model ?? fallbackCrystal())
+      })
+      .catch(() => {
+        pulseGroup.remove(placeholder)
+        pulseGroup.add(fallbackCrystal())
+      })
 
     const spriteMat = new THREE.SpriteMaterial({
       map: tex,
@@ -233,7 +250,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
       depthWrite: false,
     })
     const sprite = new THREE.Sprite(spriteMat)
-    sprite.scale.set(0.9, 0.9, 1)
+    sprite.scale.set(1.0, 1.0, 1)
     sprite.position.set(x, 0.5, z)
     beaconGroup.add(sprite)
     glowSprites.push(sprite)
@@ -248,7 +265,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     const labelHeight = 0.55
     const label = new THREE.Sprite(labelMat)
     label.scale.set(labelHeight * aspect, labelHeight, 1)
-    label.position.set(x, 1.35, z)
+    label.position.set(x, 1.55, z)
     label.renderOrder = 10
     beaconGroup.add(label)
     labelSprites.push(label)
@@ -363,10 +380,8 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
       const pulse = isActive ? 1 + 0.22 * Math.sin(t * 6) : 1 + 0.04 * Math.sin(t * 1.4 + i)
       grp.scale.setScalar(pulse)
       const c = isActive ? TEAL : AMBER
-      glyphMats[i].color.copy(c)
-      glyphMats[i].emissive.copy(c)
       glowSprites[i].material.color.copy(c)
-      glowSprites[i].scale.setScalar(isActive ? 1.3 : 0.9)
+      glowSprites[i].scale.setScalar(isActive ? 1.5 : 1.0)
       labelMats[i].color.copy(c)
       arcMats[i].color.copy(isActive ? TEAL : PANEL)
       arcMats[i].opacity = isActive ? 0.9 : 0.5
@@ -408,7 +423,6 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     renderer.dispose()
     labelMats.forEach((m) => m.dispose())
     labelTextures.forEach((t) => t.dispose())
-    glyphMats.forEach((m) => m.dispose())
     floorTex.dispose()
     wallTex.dispose()
     tex.dispose()
@@ -417,6 +431,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   if (typeof window !== 'undefined') {
     ;(window as any).__palaceScene.pickAt = pickAt
     ;(window as any).__palaceScene.hitMeshes = hitMeshes
+    ;(window as any).__palaceScene.render = () => composer.render()
   }
 
   return { setActive, flyTo, pickAt, resize, dispose }
