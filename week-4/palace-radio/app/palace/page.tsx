@@ -59,12 +59,12 @@ export default function PalacePage() {
     <main className="min-h-screen flex flex-col md:flex-row">
       <div className="relative h-[52vh] md:h-screen flex-1">
         <PalaceScene ref={sceneRef} claimed={claimed} onPick={(id) => select(id)} />
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
           <Link href="/" className="text-xs text-[var(--fg-dim)] hover:text-[var(--amber)]">
             ← Palace Radio
           </Link>
         </div>
-        <div className="absolute bottom-4 left-4 text-[10px] uppercase tracking-widest text-[var(--fg-dim)]">
+        <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm rounded px-2 py-1 text-[10px] uppercase tracking-widest text-[var(--fg-dim)]">
           WASD to walk · drag to look · click a glowing spot
         </div>
       </div>
