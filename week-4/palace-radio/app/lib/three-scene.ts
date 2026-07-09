@@ -83,6 +83,66 @@ function gridTexture(cell: number, lineColor: string, bg: string): THREE.Texture
   return tex
 }
 
+/** Real flooring instead of a pure hologram grid -- dark reclaimed-wood
+ * planks, each row a slightly different random shade with a few random
+ * vertical seam breaks so it doesn't tile as an obvious repeat. */
+function woodFloorTexture(): THREE.Texture {
+  const size = 512
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#100c09'
+  ctx.fillRect(0, 0, size, size)
+  const rows = 10
+  const plankH = size / rows
+  for (let i = 0; i < rows; i++) {
+    const shade = 20 + Math.floor(Math.random() * 14)
+    ctx.fillStyle = `rgb(${shade + 14},${shade + 9},${shade + 5})`
+    ctx.fillRect(0, i * plankH, size, plankH - 2)
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(0, i * plankH + plankH - 1)
+    ctx.lineTo(size, i * plankH + plankH - 1)
+    ctx.stroke()
+    const breaks = 1 + Math.floor(Math.random() * 2)
+    for (let b = 0; b < breaks; b++) {
+      const bx = Math.random() * size
+      ctx.beginPath()
+      ctx.moveTo(bx, i * plankH)
+      ctx.lineTo(bx, (i + 1) * plankH - 2)
+      ctx.stroke()
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  return tex
+}
+
+/** A soft mottled "painted plaster" noise on the walls instead of a flat
+ * color -- subtle, so it reads as a real painted surface without competing
+ * with the furniture in front of it (same restraint as the trim strips). */
+function plasterTexture(base: string): THREE.Texture {
+  const size = 256
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, size, size)
+  const img = ctx.getImageData(0, 0, size, size)
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 16
+    img.data[i] = Math.max(0, Math.min(255, img.data[i] + n))
+    img.data[i + 1] = Math.max(0, Math.min(255, img.data[i + 1] + n))
+    img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2] + n))
+  }
+  ctx.putImageData(img, 0, 0)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(4, 2)
+  return tex
+}
+
 function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
   ctx.moveTo(x + r, y)
@@ -174,28 +234,30 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
 
   const tex = glowTexture()
 
-  const floorTex = gridTexture(12, 'rgba(43,227,184,0.4)', '#0a0f10')
+  const floorTex = woodFloorTexture()
   floorTex.repeat.set(ROOM.width / 2, ROOM.depth / 2)
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM.width, ROOM.depth),
-    new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9, metalness: 0.1 })
+    new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85, metalness: 0.05 })
   )
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
 
-  // --- walls + ceiling: plain dark matte panels + a thin glowing baseboard
+  // --- walls + ceiling: painted-plaster panels + a thin glowing baseboard
   // trim (not a grid texture across the whole surface — that competed with
   // the furniture standing in front of it). South wall is split around the
   // door so it's an actual walkable opening, not just a non-colliding prop
   // standing in front of solid geometry.
   const halfW = ROOM.width / 2
   const halfD = ROOM.depth / 2
-  // Lighter + a faint emissive lift than a pure light-absorbing matte, so the
-  // walls read as a surface against the black void bg instead of vanishing
-  // into it -- the original near-black tone was indistinguishable from the
-  // background except right under a light.
+  // Painted-plaster noise texture (subtle, not a pattern) on a lighter base
+  // than a pure light-absorbing matte + a faint emissive lift, so the walls
+  // read as a real painted surface against the black void bg instead of
+  // vanishing into it -- the original flat near-black tone was
+  // indistinguishable from the background except right under a light.
+  const wallTex = plasterTexture('#182527')
   const wallMat = new THREE.MeshStandardMaterial({
-    color: '#182527',
+    map: wallTex,
     emissive: '#0a1516',
     emissiveIntensity: 0.5,
     roughness: 0.82,
@@ -517,6 +579,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     floorTex.dispose()
     tex.dispose()
     wallMat.dispose()
+    wallTex.dispose()
     trimMat.dispose()
     accentMats.forEach((m) => m.dispose())
   }
