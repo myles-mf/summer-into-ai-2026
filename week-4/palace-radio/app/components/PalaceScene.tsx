@@ -2,19 +2,19 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { createScene, type SceneAPI } from '../lib/three-scene'
-import type { BeaconNode } from '../lib/nodes'
+import type { ClaimedNode } from '../lib/claim'
 
 export type PalaceSceneHandle = SceneAPI
 
-const PalaceScene = forwardRef<PalaceSceneHandle, { nodes: BeaconNode[]; onPick?: (index: number) => void }>(
-  function PalaceScene({ nodes, onPick }, ref) {
+const PalaceScene = forwardRef<PalaceSceneHandle, { claimed: ClaimedNode[]; onPick?: (propId: string) => void }>(
+  function PalaceScene({ claimed, onPick }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const apiRef = useRef<SceneAPI | null>(null)
-    const nodesKey = nodes.map((n) => n.locus).join('|')
+    const claimedKey = claimed.map((c) => c.prop.id).join('|')
 
     useEffect(() => {
-      if (!canvasRef.current || nodes.length === 0) return
-      const api = createScene(canvasRef.current, nodes, onPick)
+      if (!canvasRef.current) return
+      const api = createScene(canvasRef.current, claimed, onPick)
       apiRef.current = api
       // ResizeObserver (not a window 'resize' listener) so the camera's
       // aspect ratio is corrected the moment the canvas gets its real
@@ -28,13 +28,13 @@ const PalaceScene = forwardRef<PalaceSceneHandle, { nodes: BeaconNode[]; onPick?
         apiRef.current = null
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nodesKey])
+    }, [claimedKey])
 
     useImperativeHandle(
       ref,
       () => ({
-        setActive: (i) => apiRef.current?.setActive(i),
-        flyTo: (i, d) => apiRef.current?.flyTo(i, d),
+        setActive: (id) => apiRef.current?.setActive(id),
+        flyTo: (id, d) => apiRef.current?.flyTo(id, d),
         pickAt: (x, y) => apiRef.current?.pickAt(x, y) ?? null,
         resize: () => apiRef.current?.resize(),
         dispose: () => apiRef.current?.dispose(),

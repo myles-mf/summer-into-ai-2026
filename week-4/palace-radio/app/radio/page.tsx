@@ -5,25 +5,34 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import PalaceScene, { type PalaceSceneHandle } from '../components/PalaceScene'
 import { loadPalace, savePalace, type PalaceState, type Association } from '../lib/palace'
-import { layoutRoom } from '../lib/nodes'
+import { claimHouse, type ClaimedNode } from '../lib/claim'
 import { encodeBroadcast, type DecoderEntry } from '../lib/cipher'
 import { decodeLines, playSequence, stitchToWav, downloadBlob, type PlaybackHandle } from '../lib/audio-engine'
 
 type Mode = 'plain' | 'cipher'
 type Phase = 'idle' | 'tuning' | 'playing' | 'done'
 
-const INTRO = "Transmission opening. This is the Keeper. Let's walk the ring."
-const OUTRO = "That's the last beacon. Transmission complete."
+const INTRO = "Transmission opening. This is the Keeper. Let's walk the house."
+const OUTRO = "That's the last spot. Transmission complete."
 
-function buildScript(associations: Association[], mode: Mode) {
+function buildScript(claimed: ClaimedNode[], mode: Mode) {
+  // Display associations use the CLAIMED PROP's own name as the locus, not
+  // the original AI-generated word — those can differ once claiming falls
+  // back to "next unclaimed spot," and the room only knows its own names.
+  const display: Association[] = claimed.map((c) => ({
+    locus: c.prop.id,
+    item: c.association.item,
+    sentence: c.association.sentence,
+  }))
+
   if (mode === 'cipher') {
-    const { spoken, decoder } = encodeBroadcast(associations)
-    const lineNode: (number | null)[] = [null, ...associations.map((_, i) => i), null]
-    return { spoken, decoder, lineNode }
+    const { spoken, decoder } = encodeBroadcast(display)
+    const lineProp: (string | null)[] = [null, ...claimed.map((c) => c.prop.id), null]
+    return { spoken, decoder, lineProp }
   }
-  const spoken = [INTRO, ...associations.map((a) => `At the ${a.locus}. ${a.sentence}.`), OUTRO]
-  const lineNode: (number | null)[] = [null, ...associations.map((_, i) => i), null]
-  return { spoken, decoder: [] as DecoderEntry[], lineNode }
+  const spoken = [INTRO, ...display.map((a) => `At the ${a.locus}. ${a.sentence}.`), OUTRO]
+  const lineProp: (string | null)[] = [null, ...claimed.map((c) => c.prop.id), null]
+  return { spoken, decoder: [] as DecoderEntry[], lineProp }
 }
 
 function RadioContent() {
@@ -67,8 +76,8 @@ function RadioContent() {
     setPalace(p)
   }, [router, searchParams])
 
-  const nodes = useMemo(() => (palace ? layoutRoom(palace.loci) : []), [palace])
-  const script = useMemo(() => (palace ? buildScript(palace.associations, mode) : null), [palace, mode])
+  const claimed: ClaimedNode[] = useMemo(() => (palace ? claimHouse(palace.associations) : []), [palace])
+  const script = useMemo(() => (claimed.length ? buildScript(claimed, mode) : null), [claimed, mode])
 
   async function startBroadcast() {
     if (!palace || !script) return
@@ -79,16 +88,18 @@ function RadioContent() {
       const buffers = await decodeLines(script.spoken, (done, total) => setProgress({ done, total }))
       buffersRef.current = buffers
       setPhase('playing')
-      const cues = script.lineNode.map((nodeIdx) => ({
-        position: nodeIdx === null ? ([0, 1, 0] as [number, number, number]) : nodes[nodeIdx].position,
-      }))
+      const posByProp = new Map(claimed.map((c) => [c.prop.id, c.prop.position]))
+      const cues = script.lineProp.map((propId) => {
+        const pos = propId ? posByProp.get(propId) : undefined
+        return { position: pos ? ([pos[0], 1, pos[1]] as [number, number, number]) : ([0, 1, 0] as [number, number, number]) }
+      })
       playbackRef.current = playSequence(buffers, cues, {
         spatial,
         onLineStart: (i) => {
           setLineIndex(i)
-          const nodeIdx = script.lineNode[i]
-          sceneRef.current?.setActive(nodeIdx)
-          sceneRef.current?.flyTo(nodeIdx)
+          const propId = script.lineProp[i]
+          sceneRef.current?.setActive(propId)
+          sceneRef.current?.flyTo(propId)
         },
         onDone: () => {
           setPhase('done')
@@ -136,7 +147,7 @@ function RadioContent() {
   return (
     <main className="min-h-screen flex flex-col md:flex-row">
       <div className="relative h-[52vh] md:h-screen flex-1">
-        <PalaceScene ref={sceneRef} nodes={nodes} />
+        <PalaceScene ref={sceneRef} claimed={claimed} />
         <div className="absolute top-4 left-4">
           <Link href="/" className="text-xs text-[var(--fg-dim)] hover:text-[var(--amber)]">
             ← Palace Radio
@@ -154,7 +165,7 @@ function RadioContent() {
         <span className="kicker">Palace Radio</span>
         <h1 className="headline text-2xl mt-3">On the Air</h1>
         <p className="mt-1 text-sm text-[var(--fg-dim)]">
-          One broadcast: the Keeper walks every beacon in order, in a real voice — downloadable, shareable.
+          One broadcast: the Keeper walks every claimed spot in order, in a real voice — downloadable, shareable.
         </p>
 
         <div className="mt-5 flex items-center gap-3">
@@ -226,7 +237,7 @@ function RadioContent() {
                 <thead>
                   <tr className="text-[var(--fg-dim)] text-left">
                     <th className="pb-1">code</th>
-                    <th className="pb-1">locus</th>
+                    <th className="pb-1">spot</th>
                     <th className="pb-1">item</th>
                   </tr>
                 </thead>

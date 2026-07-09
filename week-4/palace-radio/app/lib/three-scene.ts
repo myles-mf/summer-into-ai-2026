@@ -1,31 +1,30 @@
 /**
- * The Signal Station: an open holographic data-floor, not a boxed-in room
- * and not a ring of icons floating in undefined space — a lit grid floor
- * grounds everything, furniture is arranged in a room-shaped layout, but
- * there are no wall planes (tried enclosing walls first; an open grid read
- * as cleaner and more "sci-fi data-space" than a boxed room, with less
- * visual noise competing with the furniture). Furniture is real Kenney
- * "Furniture Kit" models (CC0, public/models/, loaded async via GLTFLoader)
- * for anything in our curated vocabulary, with an abstract wireframe crystal
- * fallback for anything outside it (an uploaded room photo can return an
- * open-ended word we don't have a model for). A glowing wireframe
- * transmitter core hovers at the room's center, wired to every piece of
- * furniture by signal arcs. Walking bounds are still invisible-only, set
- * directly from ROOM in the walker config, independent of any wall visuals.
+ * The Signal Station: one fixed, fully-furnished room (the "house" in
+ * house.ts) on an open holographic data-floor — not a boxed-in room, and not
+ * objects spawned per word. Every one of the house's ~16 props is always
+ * present; a memorized word CLAIMS one of them (see claim.ts) rather than
+ * creating new geometry, so adding more words never needs "new space" — you
+ * just light up more of a room that was always fully furnished. Claimed
+ * props get a glow halo + label + click-to-select; the rest sit there as
+ * plain, real furniture (Kenney "Furniture Kit", CC0, public/models/, async
+ * GLTFLoader) making the space read as a lived-in room instead of a sparse
+ * scatter of exactly N items. A glowing wireframe transmitter core hovers at
+ * the room's center, wired to every CLAIMED prop by signal arcs.
  */
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import type { BeaconNode } from './nodes'
 import { ROOM } from './nodes'
-import { loadFurnitureModel } from './model-glyph'
+import { HOUSE_PROPS } from './house'
+import type { ClaimedNode } from './claim'
+import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
 
 export type SceneAPI = {
-  setActive: (index: number | null) => void
-  flyTo: (index: number | null, durationMs?: number) => void
-  pickAt: (clientX: number, clientY: number) => number | null
+  setActive: (propId: string | null) => void
+  flyTo: (propId: string | null, durationMs?: number) => void
+  pickAt: (clientX: number, clientY: number) => string | null
   resize: () => void
   dispose: () => void
 }
@@ -48,8 +47,6 @@ function glowTexture(): THREE.Texture {
   return new THREE.CanvasTexture(canvas)
 }
 
-/** A dim grid texture for the floor/walls — a holographic room shell, not
- * solid walls, so orbiting never feels boxed-in or occludes the furniture. */
 function gridTexture(cell: number, lineColor: string, bg: string): THREE.Texture {
   const size = 256
   const canvas = document.createElement('canvas')
@@ -86,9 +83,11 @@ function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.closePath()
 }
 
-/** A small floating call-sign chip so each piece of furniture reads as "what
- * it is" at a glance too — drawn in white so it can be tinted amber/teal via
- * material.color, same trick as the glow sprite. */
+/** A small floating call-sign chip so each claimed prop reads as "what it
+ * is" at a glance — shows the PROP's own name (e.g. "DESK"), not the
+ * original word that claimed it, since those can differ (an open-ended word
+ * with no matching prop still claims *some* spot). Drawn in white so it can
+ * be tinted amber/teal via material.color, same trick as the glow sprite. */
 function labelTexture(text: string): { texture: THREE.Texture; aspect: number } {
   const dpr = 2
   const fontSize = 36 * dpr
@@ -115,7 +114,14 @@ function labelTexture(text: string): { texture: THREE.Texture; aspect: number } 
   return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height }
 }
 
-export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPick?: (index: number) => void): SceneAPI {
+function fallbackCrystal(): THREE.Object3D {
+  return new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.4, 0),
+    new THREE.MeshStandardMaterial({ color: AMBER, emissive: AMBER, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.55 })
+  )
+}
+
+export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], onPick?: (propId: string) => void): SceneAPI {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
@@ -131,11 +137,16 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   const walker = createWalkControls(camera, renderer.domElement, {
     eyeHeight: EYE_HEIGHT,
     bounds: { halfWidth: ROOM.width / 2, halfDepth: ROOM.depth / 2, margin: 0.55 },
-    collisions: nodes.map((n) => ({ x: n.position[0], z: n.position[2], radius: 1.0 })),
-    spawn: { x: 0, z: ROOM.depth / 2 - 1.7, yaw: Math.PI },
+    collisions: HOUSE_PROPS.map((p) => ({ x: p.position[0], z: p.position[1], radius: 1.0 })),
+    // Off-center + angled so near/far claimed spots get real screen-space
+    // parallax at the default view (a dead-center spawn compresses labels
+    // that share a viewing ray, e.g. a near lamp in front of a far window,
+    // into overlapping billboards — walking around it fixes itself, but the
+    // very first frame is worth composing better).
+    spawn: { x: 1.4, z: 2.6, yaw: Math.PI * 0.86 },
     onClick: (clientX, clientY) => {
-      const idx = pickAt(clientX, clientY)
-      if (idx !== null) onPick?.(idx)
+      const id = pickAt(clientX, clientY)
+      if (id !== null) onPick?.(id)
     },
   })
 
@@ -149,7 +160,6 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
 
   const tex = glowTexture()
 
-  // --- the room shell: a lit floor + four holographic grid walls ---
   const floorTex = gridTexture(12, 'rgba(43,227,184,0.4)', '#0a0f10')
   floorTex.repeat.set(ROOM.width / 2, ROOM.depth / 2)
   const floor = new THREE.Mesh(
@@ -159,10 +169,6 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
 
-  // No wall meshes by design — see the file header. The walker's invisible
-  // play-area bounds (below) still keep you from walking into the void.
-
-  // --- lighting: real shading, not flat unlit color ---
   scene.add(new THREE.HemisphereLight(0x2b3a3d, 0x0a0a0d, 0.9))
   const key = new THREE.PointLight(0xfff2d9, 12, 20, 2)
   key.position.set(0, ROOM.height - 0.4, 0)
@@ -171,92 +177,80 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   rim.position.set(-ROOM.width / 2, 2, ROOM.depth / 2)
   scene.add(rim)
 
-  // --- furniture around the room + a central transmitter core ---
-  const beaconGroup = new THREE.Group()
-  const pulseGroups: THREE.Group[] = []
+  // --- the house: every prop always present; claimed ones get interactivity ---
+  const claimedByPropId = new Map(claimed.map((c) => [c.prop.id, c.association]))
+
+  const houseGroup = new THREE.Group()
+  const pulseGroups = new Map<string, THREE.Group>()
   const hitMeshes: THREE.Mesh[] = []
-  const glowSprites: THREE.Sprite[] = []
-  const labelSprites: THREE.Sprite[] = []
-  const labelMats: THREE.SpriteMaterial[] = []
+  const glowSprites = new Map<string, THREE.Sprite>()
+  const labelMats = new Map<string, THREE.SpriteMaterial>()
   const labelTextures: THREE.Texture[] = []
 
-  function fallbackCrystal(): THREE.Object3D {
-    return new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.4, 0),
-      new THREE.MeshStandardMaterial({ color: AMBER, emissive: AMBER, emissiveIntensity: 0.55, roughness: 0.35, metalness: 0.55 })
-    )
-  }
+  HOUSE_PROPS.forEach((prop) => {
+    const [x, z] = prop.position
+    const isClaimed = claimedByPropId.has(prop.id)
 
-  nodes.forEach((node) => {
-    const [x, , z] = node.position
-
-    // real models are grounded to y=0 (model-glyph.ts normalizes them), so
-    // the whole beacon sits at floor level now, not head height.
     const pulseGroup = new THREE.Group()
     pulseGroup.position.set(x, 0, z)
-    pulseGroup.lookAt(0, 0, 0) // face the room center
-    beaconGroup.add(pulseGroup)
-    pulseGroups.push(pulseGroup)
+    pulseGroup.rotation.y = prop.rotationY
+    houseGroup.add(pulseGroup)
+    if (isClaimed) pulseGroups.set(prop.id, pulseGroup)
 
-    const hit = new THREE.Mesh(
-      new THREE.SphereGeometry(0.65, 10, 10),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
-    )
-    hit.position.y = 0.55
-    hit.userData.locusIndex = node.index
-    pulseGroup.add(hit)
-    hitMeshes.push(hit)
-
-    // lightweight placeholder shown while the real model streams in
     const placeholder = fallbackCrystal()
     placeholder.position.y = 0.5
-    placeholder.scale.setScalar(0.6)
+    placeholder.scale.setScalar(0.5)
+    placeholder.visible = isClaimed // unclaimed props don't need a loading placeholder halo
     pulseGroup.add(placeholder)
 
-    loadFurnitureModel(node.locus)
+    loadModel(prop.model)
       .then((model) => {
         pulseGroup.remove(placeholder)
-        pulseGroup.add(model ?? fallbackCrystal())
+        pulseGroup.add(model)
       })
       .catch(() => {
-        pulseGroup.remove(placeholder)
-        pulseGroup.add(fallbackCrystal())
+        placeholder.visible = true
       })
 
-    const spriteMat = new THREE.SpriteMaterial({
-      map: tex,
-      color: AMBER,
-      transparent: true,
-      opacity: 0.3,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-    const sprite = new THREE.Sprite(spriteMat)
-    sprite.scale.set(1.0, 1.0, 1)
-    sprite.position.set(x, 0.5, z)
-    beaconGroup.add(sprite)
-    glowSprites.push(sprite)
+    if (isClaimed) {
+      const hit = new THREE.Mesh(
+        new THREE.SphereGeometry(0.65, 10, 10),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false })
+      )
+      hit.position.y = 0.55
+      hit.userData.propId = prop.id
+      pulseGroup.add(hit)
+      hitMeshes.push(hit)
 
-    const { texture: labelTex, aspect } = labelTexture(node.locus)
-    const labelMat = new THREE.SpriteMaterial({
-      map: labelTex,
-      color: AMBER,
-      transparent: true,
-      depthTest: false,
-    })
-    const labelHeight = 0.55
-    const label = new THREE.Sprite(labelMat)
-    label.scale.set(labelHeight * aspect, labelHeight, 1)
-    label.position.set(x, 1.55, z)
-    label.renderOrder = 10
-    beaconGroup.add(label)
-    labelSprites.push(label)
-    labelMats.push(labelMat)
-    labelTextures.push(labelTex)
+      const spriteMat = new THREE.SpriteMaterial({
+        map: tex,
+        color: AMBER,
+        transparent: true,
+        opacity: 0.3,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+      const sprite = new THREE.Sprite(spriteMat)
+      sprite.scale.set(1.0, 1.0, 1)
+      sprite.position.set(x, 0.5, z)
+      houseGroup.add(sprite)
+      glowSprites.set(prop.id, sprite)
+
+      const { texture: labelTex, aspect } = labelTexture(prop.id)
+      const labelMat = new THREE.SpriteMaterial({ map: labelTex, color: AMBER, transparent: true, depthTest: false })
+      const labelHeight = 0.55
+      const label = new THREE.Sprite(labelMat)
+      label.scale.set(labelHeight * aspect, labelHeight, 1)
+      label.position.set(x, 1.55, z)
+      label.renderOrder = 10
+      houseGroup.add(label)
+      labelMats.set(prop.id, labelMat)
+      labelTextures.push(labelTex)
+    }
   })
-  scene.add(beaconGroup)
+  scene.add(houseGroup)
 
-  // the transmitter core — the room's actual broadcast device
+  // the transmitter core — wired only to CLAIMED spots (your actual memories)
   const coreMat = new THREE.MeshStandardMaterial({
     color: AMBER,
     emissive: AMBER,
@@ -275,11 +269,10 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   coreGlow.position.copy(core.position)
   scene.add(coreGlow)
 
-  // signal arcs: every piece of furniture wired to the transmitter core
   const arcGroup = new THREE.Group()
-  const arcMats: THREE.LineBasicMaterial[] = []
-  nodes.forEach((node) => {
-    const [x, , z] = node.position
+  const arcMats = new Map<string, THREE.LineBasicMaterial>()
+  claimed.forEach(({ prop }) => {
+    const [x, z] = prop.position
     const curve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(x, 0.7, z),
       new THREE.Vector3(x * 0.4, 1.5, z * 0.4),
@@ -288,7 +281,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(20))
     const mat = new THREE.LineBasicMaterial({ color: PANEL, transparent: true, opacity: 0.5 })
     arcGroup.add(new THREE.Line(geo, mat))
-    arcMats.push(mat)
+    arcMats.set(prop.id, mat)
   })
   scene.add(arcGroup)
 
@@ -297,7 +290,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   const bloom = new UnrealBloomPass(new THREE.Vector2(canvas.clientWidth, canvas.clientHeight), 0.5, 0.5, 0.35)
   composer.addPass(bloom)
 
-  let activeIndex: number | null = null
+  let activePropId: string | null = null
   let flyTarget: THREE.Vector3 | null = null
   let flyLookAt: THREE.Vector3 | null = null
   let flyStart = 0
@@ -306,14 +299,16 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
   const flyFromLook = new THREE.Vector3()
   const currentLook = new THREE.Vector3()
 
-  function setActive(index: number | null) {
-    activeIndex = index
+  const propById = new Map(HOUSE_PROPS.map((p) => [p.id, p]))
+
+  function setActive(propId: string | null) {
+    activePropId = propId
   }
 
   /** Scripted camera moves (Palace Radio's flythrough, and clicking a locus in
    * the side panel) temporarily take over from the walker, then hand control
    * back with yaw/pitch synced so manual walking resumes without a snap. */
-  function flyTo(index: number | null, durationMs = 1300) {
+  function flyTo(propId: string | null, durationMs = 1300) {
     walker.setEnabled(false)
     flyFromPos.copy(camera.position)
     const dir = new THREE.Vector3()
@@ -321,20 +316,21 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     flyFromLook.copy(camera.position).addScaledVector(dir, 3)
     flyStart = performance.now()
     flyDuration = durationMs
-    if (index === null || !nodes[index]) {
+    const prop = propId ? propById.get(propId) : undefined
+    if (!prop) {
       flyTarget = new THREE.Vector3(0, EYE_HEIGHT, 2.4)
       flyLookAt = core.position.clone()
     } else {
-      const [x, , z] = nodes[index].position
+      const [x, z] = prop.position
       const d = new THREE.Vector2(x, z).normalize()
-      // move IN from the furniture toward the room center (not out through the wall)
+      // move IN from the prop toward the room center (not out into the void)
       flyTarget = new THREE.Vector3(x - d.x * 1.9, EYE_HEIGHT, z - d.y * 1.9)
       flyLookAt = new THREE.Vector3(x, 0.7, z)
     }
   }
 
   const raycaster = new THREE.Raycaster()
-  function pickAt(clientX: number, clientY: number): number | null {
+  function pickAt(clientX: number, clientY: number): string | null {
     const rect = canvas.getBoundingClientRect()
     const ndc = new THREE.Vector2(
       ((clientX - rect.left) / rect.width) * 2 - 1,
@@ -343,7 +339,7 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     raycaster.setFromCamera(ndc, camera)
     const hits = raycaster.intersectObjects(hitMeshes, false)
     if (!hits.length) return null
-    return (hits[0].object.userData.locusIndex as number) ?? null
+    return (hits[0].object.userData.propId as string) ?? null
   }
 
   let raf = 0
@@ -357,16 +353,21 @@ export function createScene(canvas: HTMLCanvasElement, nodes: BeaconNode[], onPi
     core.rotation.x = t * 0.15
     coreMat.emissiveIntensity = 0.7 + 0.25 * Math.sin(t * 2)
 
-    pulseGroups.forEach((grp, i) => {
-      const isActive = i === activeIndex
+    let i = 0
+    pulseGroups.forEach((grp, id) => {
+      const isActive = id === activePropId
       const pulse = isActive ? 1 + 0.22 * Math.sin(t * 6) : 1 + 0.04 * Math.sin(t * 1.4 + i)
       grp.scale.setScalar(pulse)
       const c = isActive ? TEAL : AMBER
-      glowSprites[i].material.color.copy(c)
-      glowSprites[i].scale.setScalar(isActive ? 1.5 : 1.0)
-      labelMats[i].color.copy(c)
-      arcMats[i].color.copy(isActive ? TEAL : PANEL)
-      arcMats[i].opacity = isActive ? 0.9 : 0.5
+      glowSprites.get(id)!.material.color.copy(c)
+      glowSprites.get(id)!.scale.setScalar(isActive ? 1.5 : 1.0)
+      labelMats.get(id)!.color.copy(c)
+      const arcMat = arcMats.get(id)
+      if (arcMat) {
+        arcMat.color.copy(isActive ? TEAL : PANEL)
+        arcMat.opacity = isActive ? 0.9 : 0.5
+      }
+      i++
     })
 
     if (flyTarget && flyLookAt) {

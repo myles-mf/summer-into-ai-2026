@@ -1,20 +1,15 @@
 /**
- * Palace state. Loci come either from the fixed template or from the vision
- * model's read of an uploaded room photo; the photo itself (if any) is kept
- * only as a soft backdrop texture behind the 3D beacon ring, never pinned to.
+ * Palace state. "Loci" are words that CLAIM a spot in the fixed house
+ * (house.ts) — they don't spawn anything. The template vocabulary is just
+ * the house's own prop names, in house tour order; a topic/list can also be
+ * open-ended (any words), which claims remaining house spots in order (see
+ * claim.ts). Photo upload still runs the vision model for personalization,
+ * but its words resolve against the same fixed house, not a reconstruction
+ * of the photographed room.
  */
-export const TEMPLATE_LOCI = [
-  'door',
-  'desk',
-  'window',
-  'bed',
-  'shelf',
-  'chair',
-  'lamp',
-  'bookshelf',
-  'mirror',
-  'table',
-] as const
+import { HOUSE_WORDS } from './house'
+
+export const TEMPLATE_LOCI = HOUSE_WORDS
 
 export type Association = { locus: string; item: string; sentence: string }
 

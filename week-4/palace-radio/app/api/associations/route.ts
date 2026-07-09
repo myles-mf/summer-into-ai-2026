@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const topicOrList = body.topicOrList?.trim()
-  const loci = (body.loci?.length ? body.loci : TEMPLATE_LOCI).slice(0, 10)
+  const loci = (body.loci?.length ? body.loci : TEMPLATE_LOCI).slice(0, TEMPLATE_LOCI.length)
   if (!topicOrList) return NextResponse.json({ error: 'topicOrList is required' }, { status: 400 })
 
   const openai = new OpenAI({ apiKey })

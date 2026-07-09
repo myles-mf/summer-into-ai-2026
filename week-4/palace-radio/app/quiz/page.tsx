@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { loadPalace, type Association } from '../lib/palace'
+import { claimHouse } from '../lib/claim'
 
 type Question = { prompt: string; options: string[]; answer: string; kind: 'locus' | 'item' }
 
@@ -44,7 +45,11 @@ export default function QuizPage() {
       router.replace('/create')
       return
     }
-    setAssociations(p.associations)
+    // Quiz on the CLAIMED prop names, same convention as the 3D room and
+    // the broadcast — otherwise "where is X" could name a spot the room
+    // itself doesn't call that (claiming can fall back to a different word).
+    const claimed = claimHouse(p.associations)
+    setAssociations(claimed.map((c) => ({ locus: c.prop.id, item: c.association.item, sentence: c.association.sentence })))
   }, [router])
 
   const questions = useMemo(() => (associations ? buildQuestions(associations) : []), [associations])

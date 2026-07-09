@@ -99,9 +99,9 @@ export default function CreatePage() {
         {step === 'choose' && (
           <div className="grid gap-4 sm:grid-cols-2">
             <button type="button" onClick={chooseTemplate} className="panel crt p-6 text-left hover:border-[var(--amber)] transition">
-              <span className="font-bold text-[var(--amber)]">Template station</span>
+              <span className="font-bold text-[var(--amber)]">The Station house</span>
               <p className="mt-2 text-sm text-[var(--fg-dim)]">
-                Ten beacons around a full room: door, desk, window, bed, shelf, chair, lamp, bookshelf, mirror, table. Instant — try it in under a minute.
+                A fixed, fully-furnished room — desk, bed, bookshelf, window, and more. Your words claim spots already there, up to {TEMPLATE_LOCI.length}. Instant — try it in under a minute.
               </p>
             </button>
             <div className="panel crt p-6">
