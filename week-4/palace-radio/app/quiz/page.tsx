@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { loadPalace, type Association } from '../lib/palace'
+import { useRouter, useSearchParams } from 'next/navigation'
+import type { Association } from '../lib/palace'
+import { getPalace } from '../lib/palace-library'
 import { claimHouse } from '../lib/claim'
+import { getTemplate } from '../lib/house'
 
 type Question = { prompt: string; options: string[]; answer: string; kind: 'locus' | 'item' }
 
@@ -29,8 +31,12 @@ function buildQuestions(associations: Association[]): Question[] {
   })
 }
 
-export default function QuizPage() {
+function QuizContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id')
+  const wing = parseInt(searchParams.get('wing') ?? '0', 10) || 0
+
   const [associations, setAssociations] = useState<Association[] | null>(null)
   const [index, setIndex] = useState(0)
   const [score, setScore] = useState(0)
@@ -40,17 +46,22 @@ export default function QuizPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    const p = loadPalace()
+    if (!id) {
+      router.replace('/')
+      return
+    }
+    const p = getPalace(id)
     if (!p || !p.associations.length) {
-      router.replace('/create')
+      router.replace('/')
       return
     }
     // Quiz on the CLAIMED prop names, same convention as the 3D room and
     // the broadcast — otherwise "where is X" could name a spot the room
     // itself doesn't call that (claiming can fall back to a different word).
-    const claimed = claimHouse(p.associations)
+    const template = getTemplate(p.templateId)
+    const claimed = claimHouse(p.associations, template, wing)
     setAssociations(claimed.map((c) => ({ locus: c.prop.id, item: c.association.item, sentence: c.association.sentence })))
-  }, [router])
+  }, [id, wing, router])
 
   const questions = useMemo(() => (associations ? buildQuestions(associations) : []), [associations])
 
@@ -133,5 +144,13 @@ export default function QuizPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+export default function QuizPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-[var(--fg-dim)]">Loading…</main>}>
+      <QuizContent />
+    </Suspense>
   )
 }

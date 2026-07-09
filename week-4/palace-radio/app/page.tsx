@@ -2,15 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { loadPalace } from './lib/palace'
+import { listPalaces, deletePalace, wingCount, type PalaceMeta } from './lib/palace-library'
+
+const TEMPLATE_LABEL: Record<PalaceMeta['templateId'], string> = {
+  'station-house': 'Station House',
+  'broadcast-loft': 'Broadcast Loft',
+  'greenhouse-archive': 'Greenhouse Archive',
+}
 
 export default function HomePage() {
-  const [hasPalace, setHasPalace] = useState(false)
+  const [palaces, setPalaces] = useState<PalaceMeta[]>([])
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
   const [infoOpen, setInfoOpen] = useState(false)
 
   useEffect(() => {
-    setHasPalace(Boolean(loadPalace()?.associations?.length))
+    setPalaces(listPalaces())
   }, [])
+
+  function handleDelete(id: string) {
+    deletePalace(id)
+    setPalaces(listPalaces())
+    setConfirmingDelete(null)
+  }
 
   return (
     <main className="min-h-screen relative overflow-hidden">
@@ -50,17 +63,48 @@ export default function HomePage() {
           <Link href="/create" className="btn">
             ▸ Build a palace
           </Link>
-          {hasPalace && (
-            <>
-              <Link href="/palace" className="btn btn--teal">
-                Re-enter the station
-              </Link>
-              <Link href="/radio" className="btn btn--ghost">
-                Tune in to Palace Radio
-              </Link>
-            </>
-          )}
         </div>
+
+        {palaces.length > 0 && (
+          <div className="mt-12 space-y-3 max-w-xl">
+            <span className="kicker">Your stations</span>
+            {palaces.map((p) => {
+              const wings = wingCount(p.itemCount)
+              return (
+                <div key={p.id} className="panel crt p-4 flex items-center justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className="font-bold text-[var(--paper)]">{p.name}</p>
+                    <p className="mt-0.5 text-xs text-[var(--fg-dim)]">
+                      {TEMPLATE_LABEL[p.templateId]} · {p.itemCount} item{p.itemCount === 1 ? '' : 's'}
+                      {wings > 1 ? ` · ${wings} wings` : ''} · {new Date(p.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link href={`/palace?id=${p.id}&wing=0`} className="btn btn--teal !text-xs">
+                      Re-enter
+                    </Link>
+                    <Link href={`/radio?id=${p.id}&wing=0`} className="btn btn--ghost !text-xs">
+                      Tune in
+                    </Link>
+                    {confirmingDelete === p.id ? (
+                      <button type="button" onClick={() => handleDelete(p.id)} className="btn !text-xs !border-[var(--redact)] !text-[var(--redact)]">
+                        confirm delete
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingDelete(p.id)}
+                        className="text-xs text-[var(--fg-dim)] hover:text-[var(--redact)] px-2"
+                      >
+                        delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {infoOpen && (

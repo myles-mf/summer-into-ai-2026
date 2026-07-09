@@ -4,8 +4,10 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import PalaceScene, { type PalaceSceneHandle } from '../components/PalaceScene'
-import { loadPalace, savePalace, type PalaceState, type Association } from '../lib/palace'
+import { getPalace, savePalace, wingCount, type StoredPalace } from '../lib/palace-library'
 import { claimHouse, type ClaimedNode } from '../lib/claim'
+import { getTemplate } from '../lib/house'
+import type { Association } from '../lib/palace'
 import { encodeBroadcast, type DecoderEntry } from '../lib/cipher'
 import { decodeLines, playSequence, stitchToWav, downloadBlob, type PlaybackHandle } from '../lib/audio-engine'
 
@@ -38,7 +40,10 @@ function buildScript(claimed: ClaimedNode[], mode: Mode) {
 function RadioContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [palace, setPalace] = useState<PalaceState | null>(null)
+  const id = searchParams.get('id')
+  const wing = parseInt(searchParams.get('wing') ?? '0', 10) || 0
+
+  const [palace, setPalace] = useState<StoredPalace | null>(null)
   const [mode, setMode] = useState<Mode>('plain')
   const [spatial, setSpatial] = useState(false)
   const [phase, setPhase] = useState<Phase>('idle')
@@ -57,10 +62,13 @@ function RadioContent() {
     if (encoded) {
       try {
         const json = atob(decodeURIComponent(encoded))
-        const data = JSON.parse(json) as { associations: Association[]; loci: string[] }
-        if (data.associations?.length && data.loci?.length) {
-          savePalace({ associations: data.associations, loci: data.loci })
-          setPalace(loadPalace())
+        const data = JSON.parse(json) as StoredPalace
+        if (data.id && data.associations?.length && data.loci?.length) {
+          // Upsert into the recipient's OWN library rather than clobbering
+          // whatever palace they already had loaded -- this matters once
+          // multiple palaces exist (it didn't when there was only one slot).
+          savePalace(data)
+          setPalace(getPalace(data.id))
           setMode(searchParams.get('mode') === 'cipher' ? 'cipher' : 'plain')
           return
         }
@@ -68,15 +76,23 @@ function RadioContent() {
         /* invalid payload, fall through */
       }
     }
-    const p = loadPalace()
+    if (!id) {
+      router.replace('/')
+      return
+    }
+    const p = getPalace(id)
     if (!p || !p.associations.length) {
-      router.replace('/create')
+      router.replace('/')
       return
     }
     setPalace(p)
-  }, [router, searchParams])
+  }, [id, router, searchParams])
 
-  const claimed: ClaimedNode[] = useMemo(() => (palace ? claimHouse(palace.associations) : []), [palace])
+  const template = palace ? getTemplate(palace.templateId) : null
+  const claimed: ClaimedNode[] = useMemo(
+    () => (palace && template ? claimHouse(palace.associations, template, wing) : []),
+    [palace, template, wing]
+  )
   const script = useMemo(() => (claimed.length ? buildScript(claimed, mode) : null), [claimed, mode])
 
   async function startBroadcast() {
@@ -130,9 +146,8 @@ function RadioContent() {
 
   function copyBroadcastLink() {
     if (!palace) return
-    const payload = { associations: palace.associations, loci: palace.loci }
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))))
-    let url = `${window.location.origin}/radio?p=${encodeURIComponent(encoded)}`
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(palace))))
+    let url = `${window.location.origin}/radio?id=${palace.id}&wing=${wing}&p=${encodeURIComponent(encoded)}`
     if (mode === 'cipher') url += '&mode=cipher'
     navigator.clipboard.writeText(url).then(() => {
       setLinkCopied(true)
@@ -140,15 +155,17 @@ function RadioContent() {
     })
   }
 
-  if (!palace || !script) {
+  if (!palace || !script || !template) {
     return <main className="min-h-screen flex items-center justify-center text-[var(--fg-dim)]">Tuning…</main>
   }
+
+  const wings = wingCount(palace.itemCount)
 
   return (
     <main className="min-h-screen flex flex-col md:flex-row">
       <div className="relative h-[52vh] md:h-screen flex-1">
-        <PalaceScene ref={sceneRef} claimed={claimed} />
-        <div className="absolute top-4 left-4">
+        <PalaceScene ref={sceneRef} claimed={claimed} template={template} />
+        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
           <Link href="/" className="text-xs text-[var(--fg-dim)] hover:text-[var(--amber)]">
             ← Palace Radio
           </Link>
@@ -162,11 +179,28 @@ function RadioContent() {
       </div>
 
       <aside className="panel crt w-full md:w-96 p-6 flex flex-col">
-        <span className="kicker">Palace Radio</span>
+        <span className="kicker">{palace.name}</span>
         <h1 className="headline text-2xl mt-3">On the Air</h1>
         <p className="mt-1 text-sm text-[var(--fg-dim)]">
           One broadcast: the Keeper walks every claimed spot in order, in a real voice — downloadable, shareable.
         </p>
+
+        {wings > 1 && (
+          <div className="mt-3 flex items-center gap-2 text-xs">
+            <span className="text-[var(--fg-dim)]">wing</span>
+            {Array.from({ length: wings }, (_, w) => (
+              <Link
+                key={w}
+                href={`/radio?id=${palace.id}&wing=${w}`}
+                className={`border px-2 py-1 ${
+                  w === wing ? 'border-[var(--amber)] text-[var(--amber)]' : 'border-[var(--line)] text-[var(--fg-dim)]'
+                }`}
+              >
+                {w + 1}
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="mt-5 flex items-center gap-3">
           <div className="flex border border-[var(--line)]">
@@ -256,10 +290,10 @@ function RadioContent() {
         )}
 
         <div className="mt-auto pt-6 flex gap-2">
-          <Link href="/palace" className="btn btn--ghost !text-xs">
+          <Link href={`/palace?id=${palace.id}&wing=${wing}`} className="btn btn--ghost !text-xs">
             Explore
           </Link>
-          <Link href="/quiz" className="btn btn--ghost !text-xs">
+          <Link href={`/quiz?id=${palace.id}&wing=${wing}`} className="btn btn--ghost !text-xs">
             Quiz
           </Link>
         </div>

@@ -20,7 +20,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ROOM } from './nodes'
-import { HOUSE_PROPS } from './house'
+import type { RoomTemplate } from './house'
 import type { ClaimedNode } from './claim'
 import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
@@ -33,9 +33,9 @@ export type SceneAPI = {
   dispose: () => void
 }
 
+// Shared across every room template -- the claimed/active signal color is
+// semantically distinct from a room's own palette, not part of its decor.
 const AMBER = new THREE.Color('#ffb020')
-const TEAL = new THREE.Color('#2be3b8')
-const PANEL = new THREE.Color('#123033')
 
 /** Wall-mounted architectural fixtures -- the ambient "breathing" scale pulse
  * (below) reads as a broken height-bounce on something rigid and built-in
@@ -83,15 +83,16 @@ function gridTexture(cell: number, lineColor: string, bg: string): THREE.Texture
   return tex
 }
 
-/** Real flooring instead of a pure hologram grid -- dark reclaimed-wood
- * planks, each row a slightly different random shade with a few random
- * vertical seam breaks so it doesn't tile as an obvious repeat. */
-function woodFloorTexture(): THREE.Texture {
+/** Real flooring instead of a pure hologram grid -- reclaimed-wood planks
+ * tinted from the template's own base color, each row a slightly different
+ * random shade with a few random vertical seam breaks so it doesn't tile as
+ * an obvious repeat. */
+function woodFloorTexture(base: string): THREE.Texture {
   const size = 512
   const canvas = document.createElement('canvas')
   canvas.width = canvas.height = size
   const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#100c09'
+  ctx.fillStyle = base
   ctx.fillRect(0, 0, size, size)
   const rows = 10
   const plankH = size / rows
@@ -291,7 +292,15 @@ function fallbackCrystal(): THREE.Object3D {
   )
 }
 
-export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], onPick?: (propId: string) => void): SceneAPI {
+export function createScene(
+  canvas: HTMLCanvasElement,
+  claimed: ClaimedNode[],
+  template: RoomTemplate,
+  onPick?: (propId: string) => void
+): SceneAPI {
+  const TRIM = new THREE.Color(template.palette.trim)
+  const DIM_TRIM = TRIM.clone().multiplyScalar(0.4)
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
@@ -307,7 +316,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   const walker = createWalkControls(camera, renderer.domElement, {
     eyeHeight: EYE_HEIGHT,
     bounds: { halfWidth: ROOM.width / 2, halfDepth: ROOM.depth / 2, margin: 0.55 },
-    collisions: HOUSE_PROPS.filter((p) => p.collisionRadius > 0).map((p) => ({
+    collisions: template.props.filter((p) => p.collisionRadius > 0).map((p) => ({
       x: p.position[0],
       z: p.position[1],
       radius: p.collisionRadius,
@@ -334,7 +343,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
 
   const tex = glowTexture()
 
-  const floorTex = woodFloorTexture()
+  const floorTex = woodFloorTexture(template.palette.floorBase)
   floorTex.repeat.set(ROOM.width / 2, ROOM.depth / 2)
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM.width, ROOM.depth),
@@ -355,7 +364,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   // read as a real painted surface against the black void bg instead of
   // vanishing into it -- the original flat near-black tone was
   // indistinguishable from the background except right under a light.
-  const wallTex = plasterTexture('#182527')
+  const wallTex = plasterTexture(template.palette.wallBase)
   const wallMat = new THREE.MeshStandardMaterial({
     map: wallTex,
     emissive: '#0a1516',
@@ -364,8 +373,8 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     metalness: 0.1,
   })
   const trimMat = new THREE.MeshStandardMaterial({
-    color: TEAL,
-    emissive: TEAL,
+    color: TRIM,
+    emissive: TRIM,
     emissiveIntensity: 0.6,
     roughness: 0.4,
     metalness: 0.3,
@@ -447,7 +456,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   // bare PlaneGeometry is single-sided by default, and copying the window
   // prop's own rotationY flipped this plane's normal away from the camera.
   // DoubleSide is the robust fix for a thin decorative backdrop like this.)
-  const windowProp = HOUSE_PROPS.find((p) => p.id === 'window')
+  const windowProp = template.props.find((p) => p.id === 'window')
   const windowTex = windowGlowTexture()
   let windowBackdrop: THREE.Mesh | null = null
   if (windowProp) {
@@ -487,7 +496,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   const labelMats = new Map<string, THREE.SpriteMaterial>()
   const labelTextures: THREE.Texture[] = []
 
-  HOUSE_PROPS.forEach((prop) => {
+  template.props.forEach((prop) => {
     const [x, z] = prop.position
     const isClaimed = claimedByPropId.has(prop.id)
 
@@ -596,7 +605,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
       core.position.clone(),
     ])
     const geo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(20))
-    const mat = new THREE.LineBasicMaterial({ color: PANEL, transparent: true, opacity: 0.5 })
+    const mat = new THREE.LineBasicMaterial({ color: DIM_TRIM, transparent: true, opacity: 0.5 })
     arcGroup.add(new THREE.Line(geo, mat))
     arcMats.set(prop.id, mat)
   })
@@ -616,7 +625,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   const flyFromLook = new THREE.Vector3()
   const currentLook = new THREE.Vector3()
 
-  const propById = new Map(HOUSE_PROPS.map((p) => [p.id, p]))
+  const propById = new Map(template.props.map((p) => [p.id, p]))
 
   function setActive(propId: string | null) {
     activePropId = propId
@@ -677,13 +686,13 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
         const pulse = isActive ? 1 + 0.22 * Math.sin(t * 6) : 1 + 0.04 * Math.sin(t * 1.4 + i)
         grp.scale.setScalar(pulse)
       }
-      const c = isActive ? TEAL : AMBER
+      const c = isActive ? TRIM : AMBER
       glowSprites.get(id)!.material.color.copy(c)
       glowSprites.get(id)!.scale.setScalar(isActive ? 1.5 : 1.0)
       labelMats.get(id)!.color.copy(c)
       const arcMat = arcMats.get(id)
       if (arcMat) {
-        arcMat.color.copy(isActive ? TEAL : PANEL)
+        arcMat.color.copy(isActive ? TRIM : DIM_TRIM)
         arcMat.opacity = isActive ? 0.9 : 0.5
       }
       i++

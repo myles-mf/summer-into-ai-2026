@@ -3,18 +3,21 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { createScene, type SceneAPI } from '../lib/three-scene'
 import type { ClaimedNode } from '../lib/claim'
+import type { RoomTemplate } from '../lib/house'
 
 export type PalaceSceneHandle = SceneAPI
 
-const PalaceScene = forwardRef<PalaceSceneHandle, { claimed: ClaimedNode[]; onPick?: (propId: string) => void }>(
-  function PalaceScene({ claimed, onPick }, ref) {
+const PalaceScene = forwardRef<
+  PalaceSceneHandle,
+  { claimed: ClaimedNode[]; template: RoomTemplate; onPick?: (propId: string) => void }
+>(function PalaceScene({ claimed, template, onPick }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const apiRef = useRef<SceneAPI | null>(null)
-    const claimedKey = claimed.map((c) => c.prop.id).join('|')
+    const claimedKey = claimed.map((c) => c.prop.id).join('|') + '::' + template.id
 
     useEffect(() => {
       if (!canvasRef.current) return
-      const api = createScene(canvasRef.current, claimed, onPick)
+      const api = createScene(canvasRef.current, claimed, template, onPick)
       apiRef.current = api
       // ResizeObserver (not a window 'resize' listener) so the camera's
       // aspect ratio is corrected the moment the canvas gets its real

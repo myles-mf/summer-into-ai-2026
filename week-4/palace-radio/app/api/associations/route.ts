@@ -1,7 +1,10 @@
 import OpenAI from 'openai'
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimited, sameOrigin, clientIp } from '@/app/lib/api-guard'
-import { TEMPLATE_LOCI } from '@/app/lib/palace'
+import { templateLoci, DEFAULT_TEMPLATE_ID } from '@/app/lib/house'
+import { PROPS_PER_WING } from '@/app/lib/palace-library'
+
+const DEFAULT_LOCI = templateLoci(DEFAULT_TEMPLATE_ID)
 
 const MAX_TOKENS = parseInt(process.env.AI_MAX_TOKENS ?? '700', 10)
 
@@ -12,16 +15,24 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return NextResponse.json({ error: 'OPENAI_API_KEY is not set' }, { status: 500 })
 
-  let body: { topicOrList?: string; loci?: string[] }
+  let body: { topicOrList?: string; loci?: string[]; items?: string[]; excludeItems?: string[] }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const topicOrList = body.topicOrList?.trim()
-  const loci = (body.loci?.length ? body.loci : TEMPLATE_LOCI).slice(0, TEMPLATE_LOCI.length)
+  // `items` is a pre-split literal batch -- used when a palace is growing a
+  // second (or third...) wing from an explicit list, so the client can ask
+  // for "the next 16" as a literal list rather than fragile re-description
+  // prose against the original topic string.
+  const topicOrList = (body.items?.length ? body.items.join('; ') : body.topicOrList)?.trim()
+  const loci = (body.loci?.length ? body.loci : DEFAULT_LOCI).slice(0, PROPS_PER_WING)
   if (!topicOrList) return NextResponse.json({ error: 'topicOrList is required' }, { status: 400 })
+
+  const excludeClause = body.excludeItems?.length
+    ? `\n\nDo not repeat any of these items, already covered elsewhere in this palace: ${body.excludeItems.join(', ')}.`
+    : ''
 
   const openai = new OpenAI({ apiKey })
   const prompt = `You are helping someone use the Memory Palace (Method of Loci). They want to remember: "${topicOrList}".
@@ -31,7 +42,7 @@ Use these locations as loci (in order): ${loci.join(', ')}.
 For each locus, give one short, vivid, sensory association (one sentence) — visual or slightly silly so it's easy to recall. Output valid JSON only:
 {"associations":[{"locus":"...","item":"...","sentence":"..."}, ...]}
 
-Match the number of associations to the number of loci. If the user gave a list, assign each list item to a locus in order. If they gave a topic, break it into that many key items.`
+Match the number of associations to the number of loci. If the user gave a list, assign each list item to a locus in order. If they gave a topic, break it into that many key items.${excludeClause}`
 
   try {
     const completion = await openai.chat.completions.create({
