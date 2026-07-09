@@ -24,6 +24,7 @@ import type { RoomTemplate } from './house'
 import type { ClaimedNode } from './claim'
 import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
+import { buildDecoration } from './decorations'
 
 export type SceneAPI = {
   setActive: (propId: string | null) => void
@@ -310,6 +311,21 @@ function fallbackCrystal(): THREE.Object3D {
   )
 }
 
+/** decorations.ts builders return multi-mesh Object3Ds, so a plain
+ * root.geometry.dispose() won't reach the children -- walk every descendant
+ * and dispose whatever it owns. Generic to whatever geometry/material
+ * structure a given builder happens to produce, so the vocabulary can grow
+ * without touching this cleanup logic. */
+function disposeObject3D(root: THREE.Object3D) {
+  root.traverse((obj) => {
+    const m = obj as THREE.Mesh
+    if (m.geometry) m.geometry.dispose()
+    const material = m.material
+    if (Array.isArray(material)) material.forEach((mm) => mm.dispose())
+    else if (material) (material as THREE.Material).dispose()
+  })
+}
+
 export function createScene(
   canvas: HTMLCanvasElement,
   claimed: ClaimedNode[],
@@ -515,6 +531,7 @@ export function createScene(
   const labelTextures: THREE.Texture[] = []
   const emojiMats: THREE.SpriteMaterial[] = []
   const emojiTextures: THREE.Texture[] = []
+  const decorationRoots: THREE.Object3D[] = []
 
   template.props.forEach((prop) => {
     const [x, z] = prop.position
@@ -584,18 +601,31 @@ export function createScene(
       // just above the name tag (name below, imagined detail above -- comic
       // panel order) -- skipped entirely for palaces saved before this field
       // existed, same graceful-absence handling as every other optional
-      // field in this app.
+      // field in this app. When the emoji matches a real small 3D shape
+      // (decorations.ts), render that instead of the flat glyph -- actual
+      // object presence reads much closer to "the room grew this detail"
+      // than an icon floating in space. Falls back to the flat sprite for
+      // every emoji outside that fixed vocabulary (most of them, still --
+      // this is a curated ~18-shape library, not full emoji coverage).
       const emoji = claimedByPropId.get(prop.id)?.emoji
       if (emoji) {
-        const emojiTex = emojiTexture(emoji)
-        const emojiMat = new THREE.SpriteMaterial({ map: emojiTex, transparent: true, depthTest: false })
-        const emojiSprite = new THREE.Sprite(emojiMat)
-        emojiSprite.scale.set(0.4, 0.4, 1)
-        emojiSprite.position.set(x, 2.05, z)
-        emojiSprite.renderOrder = 10
-        houseGroup.add(emojiSprite)
-        emojiMats.push(emojiMat)
-        emojiTextures.push(emojiTex)
+        const decoration = buildDecoration(emoji)
+        if (decoration) {
+          decoration.position.set(x, 2.0, z)
+          decoration.userData.bobPhase = Math.random() * Math.PI * 2
+          houseGroup.add(decoration)
+          decorationRoots.push(decoration)
+        } else {
+          const emojiTex = emojiTexture(emoji)
+          const emojiMat = new THREE.SpriteMaterial({ map: emojiTex, transparent: true, depthTest: false })
+          const emojiSprite = new THREE.Sprite(emojiMat)
+          emojiSprite.scale.set(0.4, 0.4, 1)
+          emojiSprite.position.set(x, 2.05, z)
+          emojiSprite.renderOrder = 10
+          houseGroup.add(emojiSprite)
+          emojiMats.push(emojiMat)
+          emojiTextures.push(emojiTex)
+        }
       }
     }
   })
@@ -736,6 +766,12 @@ export function createScene(
       i++
     })
 
+    decorationRoots.forEach((obj) => {
+      const phase = obj.userData.bobPhase as number
+      obj.rotation.y = t * 0.5 + phase
+      obj.position.y = 2.0 + Math.sin(t * 1.1 + phase) * 0.035
+    })
+
     if (flyTarget && flyLookAt) {
       const elapsed = performance.now() - flyStart
       const p = Math.min(1, elapsed / flyDuration)
@@ -774,6 +810,7 @@ export function createScene(
     labelTextures.forEach((t) => t.dispose())
     emojiMats.forEach((m) => m.dispose())
     emojiTextures.forEach((t) => t.dispose())
+    decorationRoots.forEach(disposeObject3D)
     floorTex.dispose()
     tex.dispose()
     wallMat.dispose()
