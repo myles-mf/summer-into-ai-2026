@@ -16,6 +16,11 @@ function getCtx(): AudioContext {
     const Ctor = window.AudioContext || (window as any).webkitAudioContext
     sharedCtx = new Ctor()
   }
+  // Browsers can create (or auto-suspend) an AudioContext in 'suspended'
+  // state even from within a click handler -- source.start() doesn't throw
+  // when this happens, it just plays nothing. No await here on purpose:
+  // resume() is safe to call redundantly and this keeps getCtx() sync.
+  if (sharedCtx.state === 'suspended') sharedCtx.resume()
   return sharedCtx
 }
 
