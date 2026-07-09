@@ -125,7 +125,11 @@ export function createWalkControls(
   function update(dt: number) {
     if (!enabled) return
     const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw))
-    const right = new THREE.Vector3(Math.sin(yaw + Math.PI / 2), 0, Math.cos(yaw + Math.PI / 2))
+    // yaw - 90 deg, not + 90 -- the other sign points at world-left of the
+    // facing direction (confirmed against how mouse-drag-right already
+    // correctly turns the view), which had D strafing left and A strafing
+    // right.
+    const right = new THREE.Vector3(Math.sin(yaw - Math.PI / 2), 0, Math.cos(yaw - Math.PI / 2))
     const move = new THREE.Vector3()
     if (keys.has('w') || keys.has('arrowup')) move.add(forward)
     if (keys.has('s') || keys.has('arrowdown')) move.sub(forward)
