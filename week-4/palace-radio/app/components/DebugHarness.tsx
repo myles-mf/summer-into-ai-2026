@@ -5,6 +5,7 @@ import { encodeBroadcast, testCipherRoundtrip } from '../lib/cipher'
 import { claimHouse } from '../lib/claim'
 import { HOUSE_PROPS } from '../lib/house'
 import { SAMPLE_PALACE } from '../lib/palace'
+import { createPalace, getPalace, listPalaces, deletePalace } from '../lib/palace-library'
 
 /** Headless verification harness — mirrors window.__gpt / window.__sov / etc.
  * across our other Summer builds. Pure-logic checks only (no network/audio),
@@ -37,16 +38,42 @@ export default function DebugHarness() {
         const allUnique = new Set(ids).size === ids.length
         return claimed.length === weird.length && allValid && allUnique
       },
+      testLibraryRoundtrip: () => {
+        const before = listPalaces().length
+        const created = createPalace({
+          name: '__test__',
+          templateId: 'station-house',
+          associations: SAMPLE_PALACE.associations,
+          loci: SAMPLE_PALACE.loci,
+        })
+        const afterCreate = listPalaces()
+        const foundInList = afterCreate.some((p) => p.id === created.id)
+        const fetched = getPalace(created.id)
+        const fetchedOk = fetched !== null && fetched.name === '__test__' && fetched.associations.length === SAMPLE_PALACE.associations.length
+        deletePalace(created.id)
+        const afterDelete = listPalaces()
+        const removedFromList = !afterDelete.some((p) => p.id === created.id)
+        const fetchedAfterDelete = getPalace(created.id)
+        const countRestored = afterDelete.length === before
+        return (
+          foundInList &&
+          fetchedOk &&
+          removedFromList &&
+          fetchedAfterDelete === null &&
+          countRestored
+        )
+      },
       selfTest() {
         const cipherOk = testCipherRoundtrip(SAMPLE_PALACE.associations)
         const exactOk = (this as any).testExactClaim()
         const fallbackOk = (this as any).testFallbackClaim()
+        const libraryOk = (this as any).testLibraryRoundtrip()
         const { spoken, decoder } = encodeBroadcast(SAMPLE_PALACE.associations)
         const spokenOk = spoken.length === SAMPLE_PALACE.associations.length + 2
         const decoderOk = decoder.length === SAMPLE_PALACE.associations.length
-        const pass = cipherOk && exactOk && fallbackOk && spokenOk && decoderOk
+        const pass = cipherOk && exactOk && fallbackOk && libraryOk && spokenOk && decoderOk
         // eslint-disable-next-line no-console
-        console.log('[palace] selfTest', { cipherOk, exactOk, fallbackOk, spokenOk, decoderOk, pass })
+        console.log('[palace] selfTest', { cipherOk, exactOk, fallbackOk, libraryOk, spokenOk, decoderOk, pass })
         return pass
       },
     }
