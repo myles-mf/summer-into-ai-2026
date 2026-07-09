@@ -256,11 +256,13 @@ function buildDoorFrame(halfWidth: number, height: number): THREE.Object3D {
   header.position.set(0, height, 0)
   group.add(header)
 
-  // An actual wood door panel, ajar on a hinge at the left jamb -- an empty
-  // frame read as a black hole into nothing once it was really the only
-  // thing standing between the room and the fog/void background. A panel
-  // swung open keeps the opening walkable but gives it a real object to look
-  // at instead of pure darkness.
+  // An actual wood door panel, closed, on a hinge at the left jamb -- an
+  // empty frame read as a black hole into nothing once it was really the
+  // only thing standing between the room and the fog/void background.
+  // Closed (not ajar) since there's nothing on the other side to walk to --
+  // an open door visually promises a passage that doesn't exist. The
+  // opening still has zero collision (see house.ts), so it stays walkable
+  // regardless of how the panel looks.
   const panelMat = new THREE.MeshStandardMaterial({ color: '#7c5c3c', roughness: 0.7, metalness: 0.08 })
   const panelWidth = halfWidth * 2 - jambW * 1.4
   const panelHeight = height * 0.96
@@ -275,7 +277,7 @@ function buildDoorFrame(halfWidth: number, height: number): THREE.Object3D {
   panel.add(knob)
   const hinge = new THREE.Group()
   hinge.position.set(-halfWidth + jambW * 0.5, 0, 0)
-  hinge.rotation.y = Math.PI * 0.34 // swung open, into the room
+  hinge.rotation.y = 0 // closed, filling the frame
   hinge.add(panel)
   group.add(hinge)
 
