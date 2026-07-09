@@ -113,15 +113,55 @@ function woodFloorTexture(): THREE.Texture {
       ctx.lineTo(bx, (i + 1) * plankH - 2)
       ctx.stroke()
     }
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)'
+    ctx.lineWidth = 1
+    for (let g = 0; g < 3; g++) {
+      const gy = i * plankH + 3 + Math.random() * (plankH - 8)
+      ctx.beginPath()
+      ctx.moveTo(0, gy)
+      for (let gx = 0; gx <= size; gx += 24) ctx.lineTo(gx, gy + (Math.random() - 0.5) * 2.5)
+      ctx.stroke()
+    }
   }
   const tex = new THREE.CanvasTexture(canvas)
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping
   return tex
 }
 
-/** A soft mottled "painted plaster" noise on the walls instead of a flat
- * color -- subtle, so it reads as a real painted surface without competing
- * with the furniture in front of it (same restraint as the trim strips). */
+/** A soft gradient "there's something out there" glow for behind the window
+ * -- the window model is mounted flush against a solid wall panel, so
+ * without this it just shows flat wall material through the glass, which
+ * doesn't read as a window at all. A dim horizon-glow strip low in the frame
+ * suggests distant signal-space beyond the wall, without needing a real
+ * cutout + skybox. */
+function windowGlowTexture(): THREE.Texture {
+  const w = 256
+  const h = 320
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  const g = ctx.createLinearGradient(0, 0, 0, h)
+  g.addColorStop(0, '#050a0b')
+  g.addColorStop(0.55, '#0c1f21')
+  g.addColorStop(0.82, '#1f4a44')
+  g.addColorStop(1, '#3fa88c')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, w, h)
+  // a few faint distant points of light, like windows of other stations
+  ctx.fillStyle = 'rgba(255,210,140,0.55)'
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * w
+    const y = h * 0.5 + Math.random() * h * 0.35
+    ctx.fillRect(x, y, 2, 2)
+  }
+  return new THREE.CanvasTexture(canvas)
+}
+
+/** A "wallpaper" for the walls instead of a flat color -- mottled paint
+ * noise plus a faint vertical pinstripe motif, kept low-contrast so it
+ * reads as a real papered surface without competing with the furniture
+ * standing in front of it (same restraint as the trim strips). */
 function plasterTexture(base: string): THREE.Texture {
   const size = 256
   const canvas = document.createElement('canvas')
@@ -137,6 +177,14 @@ function plasterTexture(base: string): THREE.Texture {
     img.data[i + 2] = Math.max(0, Math.min(255, img.data[i + 2] + n))
   }
   ctx.putImageData(img, 0, 0)
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'
+  ctx.lineWidth = 1
+  for (let x = 12; x < size; x += 24) {
+    ctx.beginPath()
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, size)
+    ctx.stroke()
+  }
   const tex = new THREE.CanvasTexture(canvas)
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping
   tex.repeat.set(4, 2)
@@ -207,6 +255,30 @@ function buildDoorFrame(halfWidth: number, height: number): THREE.Object3D {
   const header = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2 + jambW, jambW, jambD), mat)
   header.position.set(0, height, 0)
   group.add(header)
+
+  // An actual wood door panel, ajar on a hinge at the left jamb -- an empty
+  // frame read as a black hole into nothing once it was really the only
+  // thing standing between the room and the fog/void background. A panel
+  // swung open keeps the opening walkable but gives it a real object to look
+  // at instead of pure darkness.
+  const panelMat = new THREE.MeshStandardMaterial({ color: '#7c5c3c', roughness: 0.7, metalness: 0.08 })
+  const panelWidth = halfWidth * 2 - jambW * 1.4
+  const panelHeight = height * 0.96
+  const panelThickness = 0.045
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, panelThickness), panelMat)
+  panel.position.set(panelWidth / 2, panelHeight / 2, 0)
+  const knob = new THREE.Mesh(
+    new THREE.SphereGeometry(0.025, 8, 8),
+    new THREE.MeshStandardMaterial({ color: '#d9c48a', roughness: 0.3, metalness: 0.7 })
+  )
+  knob.position.set(panelWidth - 0.08, panelHeight / 2, panelThickness / 2 + 0.02)
+  panel.add(knob)
+  const hinge = new THREE.Group()
+  hinge.position.set(-halfWidth + jambW * 0.5, 0, 0)
+  hinge.rotation.y = Math.PI * 0.34 // swung open, into the room
+  hinge.add(panel)
+  group.add(hinge)
+
   return group
 }
 
@@ -361,11 +433,43 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   ceiling.rotation.x = Math.PI / 2
   wallGroup.add(ceiling)
 
+  // A dim horizon-glow backdrop sized to the window's glass pane -- tried
+  // tucking this behind the window model first, but wallWindow.glb's "glass"
+  // turned out to be opaque (fully hides anything behind it), so it has to
+  // sit just in FRONT of the model instead, filling the pane directly.
+  // (First attempt at "in front" still measured as *inside* the model's own
+  // bounding box -- z -3.489..-3.311 -- so it was still occluded; confirmed
+  // by reading the live mesh's world bounding box, not guessed twice. After
+  // fixing that, STILL invisible even as an opaque test color with fog off
+  // and dragged into open floor -- turned out to be back-face culling: a
+  // bare PlaneGeometry is single-sided by default, and copying the window
+  // prop's own rotationY flipped this plane's normal away from the camera.
+  // DoubleSide is the robust fix for a thin decorative backdrop like this.)
+  const windowProp = HOUSE_PROPS.find((p) => p.id === 'window')
+  const windowTex = windowGlowTexture()
+  let windowBackdrop: THREE.Mesh | null = null
+  if (windowProp) {
+    const [wx, wz] = windowProp.position
+    windowBackdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.3, 1.8),
+      new THREE.MeshBasicMaterial({ map: windowTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    )
+    const towardRoomCenter = wz < 0 ? 0.16 : -0.16
+    windowBackdrop.position.set(wx, 1.5, wz + towardRoomCenter)
+    windowBackdrop.rotation.y = windowProp.rotationY
+    windowBackdrop.renderOrder = 5
+    wallGroup.add(windowBackdrop)
+  }
+
   scene.add(wallGroup)
 
   scene.add(new THREE.HemisphereLight(0x2b3a3d, 0x0a0a0d, 0.9))
-  const key = new THREE.PointLight(0xfff2d9, 12, 20, 2)
-  key.position.set(0, ROOM.height - 0.4, 0)
+  // Was intensity 12 sitting directly above the transmitter core (same x=0,z=0
+  // centerline) -- close enough to the ceiling to blow it out into a flat
+  // white blob under bloom. Softer + offset off-center so it doesn't stack
+  // with the core's own glow along the same sightline.
+  const key = new THREE.PointLight(0xfff2d9, 7, 18, 2)
+  key.position.set(1.2, ROOM.height - 0.4, -0.6)
   scene.add(key)
   const rim = new THREE.PointLight(0x2be3b8, 4, 16, 2)
   rim.position.set(-ROOM.width / 2 + 0.4, 2, ROOM.depth / 2 - 0.4)
@@ -458,8 +562,21 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     wireframe: true,
   })
   const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.42, 1), coreMat)
-  core.position.set(0, 1.9, 0)
+  // Off the room's exact x=0/z=0 centerline -- the door and window both sit
+  // ON that centerline (opposite walls), so a dead-center core used to land
+  // right in the sightline looking from one to the other and read as an
+  // unexplained blob rather than a deliberate centerpiece.
+  core.position.set(0.8, 1.9, -0.2)
   scene.add(core)
+  const { texture: coreLabelTex, aspect: coreLabelAspect } = labelTexture('signal core')
+  const coreLabel = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: coreLabelTex, color: AMBER, transparent: true, depthTest: false })
+  )
+  const coreLabelH = 0.4
+  coreLabel.scale.set(coreLabelH * coreLabelAspect, coreLabelH, 1)
+  coreLabel.position.set(core.position.x, core.position.y + 0.62, core.position.z)
+  coreLabel.renderOrder = 10
+  scene.add(coreLabel)
   const coreGlow = new THREE.Sprite(
     new THREE.SpriteMaterial({ map: tex, color: AMBER, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
   )
@@ -612,6 +729,10 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     wallTex.dispose()
     trimMat.dispose()
     accentMats.forEach((m) => m.dispose())
+    coreLabelTex.dispose()
+    ;(coreLabel.material as THREE.SpriteMaterial).dispose()
+    windowTex.dispose()
+    if (windowBackdrop) (windowBackdrop.material as THREE.Material).dispose()
   }
 
   if (typeof window !== 'undefined') {
