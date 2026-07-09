@@ -37,6 +37,12 @@ const AMBER = new THREE.Color('#ffb020')
 const TEAL = new THREE.Color('#2be3b8')
 const PANEL = new THREE.Color('#123033')
 
+/** Wall-mounted architectural fixtures -- the ambient "breathing" scale pulse
+ * (below) reads as a broken height-bounce on something rigid and built-in
+ * like a door, even though it looks fine on a chair or a lamp. These keep
+ * the color-tint/glow feedback when claimed, just not the scale animation. */
+const ARCHITECTURAL = new Set(['door', 'window', 'mirror'])
+
 function glowTexture(): THREE.Texture {
   const size = 128
   const canvas = document.createElement('canvas')
@@ -184,7 +190,17 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   // standing in front of solid geometry.
   const halfW = ROOM.width / 2
   const halfD = ROOM.depth / 2
-  const wallMat = new THREE.MeshStandardMaterial({ color: '#0c1315', roughness: 0.88, metalness: 0.08 })
+  // Lighter + a faint emissive lift than a pure light-absorbing matte, so the
+  // walls read as a surface against the black void bg instead of vanishing
+  // into it -- the original near-black tone was indistinguishable from the
+  // background except right under a light.
+  const wallMat = new THREE.MeshStandardMaterial({
+    color: '#182527',
+    emissive: '#0a1516',
+    emissiveIntensity: 0.5,
+    roughness: 0.82,
+    metalness: 0.1,
+  })
   const trimMat = new THREE.MeshStandardMaterial({
     color: TEAL,
     emissive: TEAL,
@@ -193,16 +209,46 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     metalness: 0.3,
   })
   const wallGroup = new THREE.Group()
+  const accentMats: THREE.MeshStandardMaterial[] = []
+
+  // Sparse vertical accent strips (paneling seams) so a long flat wall reads
+  // as built structure, not a texture -- same "trim, not a busy surface"
+  // move as the baseboard, just oriented the other way.
+  function wallAccents(width: number, height: number, x: number, y: number, z: number, rotY: number) {
+    const spacing = 2.1
+    const count = Math.max(0, Math.floor(width / spacing) - 1)
+    if (count <= 0) return
+    const start = -width / 2 + (width - (count - 1) * spacing) / 2
+    for (let n = 0; n < count; n++) {
+      const offset = start + n * spacing
+      const mat = trimMat.clone()
+      mat.emissiveIntensity = 0.18
+      mat.opacity = 0.5
+      mat.transparent = true
+      const strip = new THREE.Mesh(new THREE.PlaneGeometry(0.035, height * 0.82), mat)
+      const localX = x + offset * Math.cos(rotY)
+      const localZ = z - offset * Math.sin(rotY)
+      strip.position.set(localX, y, localZ)
+      strip.rotation.y = rotY
+      wallGroup.add(strip)
+      accentMats.push(mat)
+    }
+  }
 
   function wallPanel(width: number, height: number, x: number, y: number, z: number, rotY: number) {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wallMat)
     mesh.position.set(x, y, z)
     mesh.rotation.y = rotY
     wallGroup.add(mesh)
-    const trim = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.06), trimMat)
-    trim.position.set(x, y - height / 2 + 0.03, z)
-    trim.rotation.y = rotY
-    wallGroup.add(trim)
+    const baseboard = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.06), trimMat)
+    baseboard.position.set(x, y - height / 2 + 0.03, z)
+    baseboard.rotation.y = rotY
+    wallGroup.add(baseboard)
+    const crown = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.04), trimMat)
+    crown.position.set(x, y + height / 2 - 0.02, z)
+    crown.rotation.y = rotY
+    wallGroup.add(crown)
+    wallAccents(width, height, x, y, z, rotY)
   }
 
   const doorHalfWidth = 0.7
@@ -416,8 +462,10 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     let i = 0
     pulseGroups.forEach((grp, id) => {
       const isActive = id === activePropId
-      const pulse = isActive ? 1 + 0.22 * Math.sin(t * 6) : 1 + 0.04 * Math.sin(t * 1.4 + i)
-      grp.scale.setScalar(pulse)
+      if (!ARCHITECTURAL.has(id)) {
+        const pulse = isActive ? 1 + 0.22 * Math.sin(t * 6) : 1 + 0.04 * Math.sin(t * 1.4 + i)
+        grp.scale.setScalar(pulse)
+      }
       const c = isActive ? TEAL : AMBER
       glowSprites.get(id)!.material.color.copy(c)
       glowSprites.get(id)!.scale.setScalar(isActive ? 1.5 : 1.0)
@@ -470,6 +518,7 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     tex.dispose()
     wallMat.dispose()
     trimMat.dispose()
+    accentMats.forEach((m) => m.dispose())
   }
 
   if (typeof window !== 'undefined') {
