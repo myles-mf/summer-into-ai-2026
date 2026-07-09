@@ -233,6 +233,24 @@ function labelTexture(text: string): { texture: THREE.Texture; aspect: number } 
   return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height }
 }
 
+/** The AI-picked glyph for a claimed spot's specific vivid detail (e.g. 💡
+ * for "a lightbulb hangs where the door should be") -- the room can't
+ * literally grow a crack or a lightbulb, but canvas can draw an emoji
+ * straight from its font, so this is the cheap bridge between what the
+ * narration describes and what you actually see, reusing the exact same
+ * canvas-texture-sprite technique as labelTexture() above. */
+function emojiTexture(emoji: string): THREE.Texture {
+  const size = 128
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = size
+  const ctx = canvas.getContext('2d')!
+  ctx.font = `${size * 0.72}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(emoji, size / 2, size / 2 + size * 0.04)
+  return new THREE.CanvasTexture(canvas)
+}
+
 /** A plain, hand-built archway -- used for the door instead of the Kenney
  * "doorwayOpen" model. That model turned out to be a door panel modeled
  * swung open on its hinge (confirmed: every node in its transform hierarchy
@@ -495,6 +513,8 @@ export function createScene(
   const glowSprites = new Map<string, THREE.Sprite>()
   const labelMats = new Map<string, THREE.SpriteMaterial>()
   const labelTextures: THREE.Texture[] = []
+  const emojiMats: THREE.SpriteMaterial[] = []
+  const emojiTextures: THREE.Texture[] = []
 
   template.props.forEach((prop) => {
     const [x, z] = prop.position
@@ -559,6 +579,24 @@ export function createScene(
       houseGroup.add(label)
       labelMats.set(prop.id, labelMat)
       labelTextures.push(labelTex)
+
+      // The AI-picked glyph for THIS spot's specific vivid detail, floating
+      // just above the name tag (name below, imagined detail above -- comic
+      // panel order) -- skipped entirely for palaces saved before this field
+      // existed, same graceful-absence handling as every other optional
+      // field in this app.
+      const emoji = claimedByPropId.get(prop.id)?.emoji
+      if (emoji) {
+        const emojiTex = emojiTexture(emoji)
+        const emojiMat = new THREE.SpriteMaterial({ map: emojiTex, transparent: true, depthTest: false })
+        const emojiSprite = new THREE.Sprite(emojiMat)
+        emojiSprite.scale.set(0.4, 0.4, 1)
+        emojiSprite.position.set(x, 2.05, z)
+        emojiSprite.renderOrder = 10
+        houseGroup.add(emojiSprite)
+        emojiMats.push(emojiMat)
+        emojiTextures.push(emojiTex)
+      }
     }
   })
   scene.add(houseGroup)
@@ -734,6 +772,8 @@ export function createScene(
     renderer.dispose()
     labelMats.forEach((m) => m.dispose())
     labelTextures.forEach((t) => t.dispose())
+    emojiMats.forEach((m) => m.dispose())
+    emojiTextures.forEach((t) => t.dispose())
     floorTex.dispose()
     tex.dispose()
     wallMat.dispose()

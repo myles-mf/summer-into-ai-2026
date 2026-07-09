@@ -31,7 +31,7 @@ export function itemToNumberPhrase(item: string): string {
     .join(' ')
 }
 
-export type DecoderEntry = { code: string; locus: string; item: string }
+export type DecoderEntry = { code: string; locus: string; item: string; emoji?: string }
 
 export function encodeBroadcast(associations: Association[]): {
   spoken: string[]
@@ -43,7 +43,7 @@ export function encodeBroadcast(associations: Association[]): {
   associations.forEach((a, i) => {
     const code = NATO[i % NATO.length]
     spoken.push(`${code}. ${itemToNumberPhrase(a.item)}`)
-    decoder.push({ code, locus: a.locus, item: a.item })
+    decoder.push({ code, locus: a.locus, item: a.item, emoji: a.emoji })
   })
 
   spoken.push('End of transmission.')

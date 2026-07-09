@@ -60,10 +60,14 @@ function QuizContent() {
     // itself doesn't call that (claiming can fall back to a different word).
     const template = getTemplate(p.templateId)
     const claimed = claimHouse(p.associations, template, wing)
-    setAssociations(claimed.map((c) => ({ locus: c.prop.id, item: c.association.item, sentence: c.association.sentence })))
+    setAssociations(claimed.map((c) => ({ locus: c.prop.id, item: c.association.item, sentence: c.association.sentence, emoji: c.association.emoji })))
   }, [id, wing, router])
 
   const questions = useMemo(() => (associations ? buildQuestions(associations) : []), [associations])
+  const itemEmoji = useMemo(
+    () => Object.fromEntries((associations ?? []).filter((a) => a.emoji).map((a) => [a.item, a.emoji as string])),
+    [associations]
+  )
 
   useEffect(() => {
     if (!challenge) return
@@ -137,6 +141,7 @@ function QuizContent() {
             return (
               <button key={opt + i} type="button" onClick={() => pick(opt)} disabled={picked !== null} className={cls}>
                 <span className="text-[var(--fg-dim)] mr-2">{i + 1}.</span>
+                {q.kind === 'item' && itemEmoji[opt] ? itemEmoji[opt] + ' ' : ''}
                 {opt}
               </button>
             )

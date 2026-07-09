@@ -134,7 +134,10 @@ function PalaceContent() {
           {active ? (
             <div>
               <p className="text-xs uppercase tracking-widest text-[var(--fg-dim)]">Spot: {active.prop.id}</p>
-              <p className="mt-1 text-xl font-bold text-[var(--amber)]">{active.association.item}</p>
+              <p className="mt-1 text-xl font-bold text-[var(--amber)]">
+                {active.association.emoji ? active.association.emoji + ' ' : ''}
+                {active.association.item}
+              </p>
               <p className="mt-3 text-sm italic text-[var(--fg-dim)]">&ldquo;{active.association.sentence}&rdquo;</p>
               <button type="button" onClick={hearThis} disabled={voicing} className="btn btn--teal mt-4 !text-xs">
                 {voicing ? '♪ playing…' : '♪ hear this'}

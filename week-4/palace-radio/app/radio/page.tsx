@@ -25,6 +25,7 @@ function buildScript(claimed: ClaimedNode[], mode: Mode) {
     locus: c.prop.id,
     item: c.association.item,
     sentence: c.association.sentence,
+    emoji: c.association.emoji,
   }))
 
   if (mode === 'cipher') {
@@ -280,7 +281,7 @@ function RadioContent() {
                     <tr key={i} className="border-t border-[var(--line)]">
                       <td className="py-1 text-[var(--amber)]">{d.code}</td>
                       <td className="py-1 text-[var(--fg-dim)]">{d.locus}</td>
-                      <td className="py-1">{d.item}</td>
+                      <td className="py-1">{d.emoji ? d.emoji + ' ' : ''}{d.item}</td>
                     </tr>
                   ))}
                 </tbody>

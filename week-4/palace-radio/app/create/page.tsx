@@ -251,7 +251,7 @@ export default function CreatePage() {
                   )}
                   <span className="text-[var(--amber)] font-bold">{a.locus}</span>
                   <span className="text-[var(--fg-dim)]"> → </span>
-                  <span>{a.item}</span>
+                  <span>{a.emoji ? a.emoji + ' ' : ''}{a.item}</span>
                   <p className="mt-1 text-sm italic text-[var(--fg-dim)]">&ldquo;{a.sentence}&rdquo;</p>
                 </li>
               ))}
