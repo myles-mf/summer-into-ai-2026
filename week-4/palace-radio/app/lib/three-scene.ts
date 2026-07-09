@@ -184,6 +184,32 @@ function labelTexture(text: string): { texture: THREE.Texture; aspect: number } 
   return { texture: new THREE.CanvasTexture(canvas), aspect: canvas.width / canvas.height }
 }
 
+/** A plain, hand-built archway -- used for the door instead of the Kenney
+ * "doorwayOpen" model. That model turned out to be a door panel modeled
+ * swung open on its hinge (confirmed: every node in its transform hierarchy
+ * has zero rotation, so the skewed look is baked into the mesh's own vertex
+ * data, not a transform we could correct). A real door on a hinge reads as
+ * broken/tilted rather than "an open doorway" once you're standing in front
+ * of it, so a simple guaranteed-upright frame -- matched to the exact same
+ * halfWidth/height the wall opening was cut to -- is the reliable fix. */
+function buildDoorFrame(halfWidth: number, height: number): THREE.Object3D {
+  const group = new THREE.Group()
+  const mat = new THREE.MeshStandardMaterial({ color: '#a8895f', roughness: 0.65, metalness: 0.12 })
+  const jambW = 0.1
+  const jambD = 0.16
+  const jambGeo = new THREE.BoxGeometry(jambW, height, jambD)
+  const left = new THREE.Mesh(jambGeo, mat)
+  left.position.set(-halfWidth, height / 2, 0)
+  group.add(left)
+  const right = new THREE.Mesh(jambGeo, mat)
+  right.position.set(halfWidth, height / 2, 0)
+  group.add(right)
+  const header = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2 + jambW, jambW, jambD), mat)
+  header.position.set(0, height, 0)
+  group.add(header)
+  return group
+}
+
 function fallbackCrystal(): THREE.Object3D {
   return new THREE.Mesh(
     new THREE.OctahedronGeometry(0.4, 0),
@@ -365,20 +391,24 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     houseGroup.add(pulseGroup)
     if (isClaimed) pulseGroups.set(prop.id, pulseGroup)
 
-    const placeholder = fallbackCrystal()
-    placeholder.position.y = 0.5
-    placeholder.scale.setScalar(0.5)
-    placeholder.visible = isClaimed // unclaimed props don't need a loading placeholder halo
-    pulseGroup.add(placeholder)
+    if (prop.id === 'door') {
+      pulseGroup.add(buildDoorFrame(doorHalfWidth, doorHeight))
+    } else {
+      const placeholder = fallbackCrystal()
+      placeholder.position.y = 0.5
+      placeholder.scale.setScalar(0.5)
+      placeholder.visible = isClaimed // unclaimed props don't need a loading placeholder halo
+      pulseGroup.add(placeholder)
 
-    loadModel(prop.model)
-      .then((model) => {
-        pulseGroup.remove(placeholder)
-        pulseGroup.add(model)
-      })
-      .catch(() => {
-        placeholder.visible = true
-      })
+      loadModel(prop.model)
+        .then((model) => {
+          pulseGroup.remove(placeholder)
+          pulseGroup.add(model)
+        })
+        .catch(() => {
+          placeholder.visible = true
+        })
+    }
 
     if (isClaimed) {
       const hit = new THREE.Mesh(
