@@ -1,15 +1,19 @@
 /**
  * The Signal Station: one fixed, fully-furnished room (the "house" in
- * house.ts) on an open holographic data-floor — not a boxed-in room, and not
- * objects spawned per word. Every one of the house's ~16 props is always
- * present; a memorized word CLAIMS one of them (see claim.ts) rather than
- * creating new geometry, so adding more words never needs "new space" — you
- * just light up more of a room that was always fully furnished. Claimed
- * props get a glow halo + label + click-to-select; the rest sit there as
- * plain, real furniture (Kenney "Furniture Kit", CC0, public/models/, async
- * GLTFLoader) making the space read as a lived-in room instead of a sparse
- * scatter of exactly N items. A glowing wireframe transmitter core hovers at
- * the room's center, wired to every CLAIMED prop by signal arcs.
+ * house.ts) — real walls, a real ceiling, a door you can actually walk
+ * through — not objects spawned per word. Every one of the house's ~16
+ * props is always present; a memorized word CLAIMS one of them (see
+ * claim.ts) rather than creating new geometry, so adding more words never
+ * needs "new space" — you're just lighting up more of a room that was
+ * always fully furnished. Claimed props get a glow halo + label +
+ * click-to-select; the rest sit there as plain, real furniture (Kenney
+ * "Furniture Kit", CC0, public/models/, async GLTFLoader, real-world scale
+ * — see model-glyph.ts) making the space read as a lived-in room instead of
+ * a sparse scatter of exactly N items. Walls are plain dark matte panels
+ * with a thin glowing baseboard trim, not a busy grid texture — a grid
+ * across a whole wall competes with the furniture sitting in front of it.
+ * A glowing wireframe transmitter core hovers at the room's center, wired
+ * to every CLAIMED prop by signal arcs.
  */
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -137,7 +141,11 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   const walker = createWalkControls(camera, renderer.domElement, {
     eyeHeight: EYE_HEIGHT,
     bounds: { halfWidth: ROOM.width / 2, halfDepth: ROOM.depth / 2, margin: 0.55 },
-    collisions: HOUSE_PROPS.map((p) => ({ x: p.position[0], z: p.position[1], radius: 1.0 })),
+    collisions: HOUSE_PROPS.filter((p) => p.collisionRadius > 0).map((p) => ({
+      x: p.position[0],
+      z: p.position[1],
+      radius: p.collisionRadius,
+    })),
     // Off-center + angled so near/far claimed spots get real screen-space
     // parallax at the default view (a dead-center spawn compresses labels
     // that share a viewing ray, e.g. a near lamp in front of a far window,
@@ -169,12 +177,64 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
   floor.rotation.x = -Math.PI / 2
   scene.add(floor)
 
+  // --- walls + ceiling: plain dark matte panels + a thin glowing baseboard
+  // trim (not a grid texture across the whole surface — that competed with
+  // the furniture standing in front of it). South wall is split around the
+  // door so it's an actual walkable opening, not just a non-colliding prop
+  // standing in front of solid geometry.
+  const halfW = ROOM.width / 2
+  const halfD = ROOM.depth / 2
+  const wallMat = new THREE.MeshStandardMaterial({ color: '#0c1315', roughness: 0.88, metalness: 0.08 })
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: TEAL,
+    emissive: TEAL,
+    emissiveIntensity: 0.6,
+    roughness: 0.4,
+    metalness: 0.3,
+  })
+  const wallGroup = new THREE.Group()
+
+  function wallPanel(width: number, height: number, x: number, y: number, z: number, rotY: number) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wallMat)
+    mesh.position.set(x, y, z)
+    mesh.rotation.y = rotY
+    wallGroup.add(mesh)
+    const trim = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.06), trimMat)
+    trim.position.set(x, y - height / 2 + 0.03, z)
+    trim.rotation.y = rotY
+    wallGroup.add(trim)
+  }
+
+  const doorHalfWidth = 0.7
+  const doorHeight = 2.2
+  // north wall (behind the window) + east + west: solid, full span
+  wallPanel(ROOM.width, ROOM.height, 0, ROOM.height / 2, -halfD, 0)
+  wallPanel(ROOM.depth, ROOM.height, -halfW, ROOM.height / 2, 0, Math.PI / 2)
+  wallPanel(ROOM.depth, ROOM.height, halfW, ROOM.height / 2, 0, -Math.PI / 2)
+  // south wall: left segment, right segment, header above the door opening
+  const southLeftWidth = halfW - doorHalfWidth
+  const southRightWidth = halfW - doorHalfWidth
+  wallPanel(southLeftWidth, ROOM.height, -(doorHalfWidth + southLeftWidth / 2), ROOM.height / 2, halfD, Math.PI)
+  wallPanel(southRightWidth, ROOM.height, doorHalfWidth + southRightWidth / 2, ROOM.height / 2, halfD, Math.PI)
+  const headerHeight = ROOM.height - doorHeight
+  const header = new THREE.Mesh(new THREE.PlaneGeometry(doorHalfWidth * 2, headerHeight), wallMat)
+  header.position.set(0, doorHeight + headerHeight / 2, halfD)
+  header.rotation.y = Math.PI
+  wallGroup.add(header)
+
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.width, ROOM.depth), wallMat)
+  ceiling.position.set(0, ROOM.height, 0)
+  ceiling.rotation.x = Math.PI / 2
+  wallGroup.add(ceiling)
+
+  scene.add(wallGroup)
+
   scene.add(new THREE.HemisphereLight(0x2b3a3d, 0x0a0a0d, 0.9))
   const key = new THREE.PointLight(0xfff2d9, 12, 20, 2)
   key.position.set(0, ROOM.height - 0.4, 0)
   scene.add(key)
   const rim = new THREE.PointLight(0x2be3b8, 4, 16, 2)
-  rim.position.set(-ROOM.width / 2, 2, ROOM.depth / 2)
+  rim.position.set(-ROOM.width / 2 + 0.4, 2, ROOM.depth / 2 - 0.4)
   scene.add(rim)
 
   // --- the house: every prop always present; claimed ones get interactivity ---
@@ -408,6 +468,8 @@ export function createScene(canvas: HTMLCanvasElement, claimed: ClaimedNode[], o
     labelTextures.forEach((t) => t.dispose())
     floorTex.dispose()
     tex.dispose()
+    wallMat.dispose()
+    trimMat.dispose()
   }
 
   if (typeof window !== 'undefined') {

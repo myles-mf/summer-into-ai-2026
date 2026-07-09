@@ -102,8 +102,11 @@ export function createWalkControls(
 
   function resolveCollision(pos: THREE.Vector3) {
     const { halfWidth, halfDepth } = opts.bounds
-    pos.x = Math.max(-halfWidth + margin, Math.min(halfWidth - margin, pos.x))
-    pos.z = Math.max(-halfDepth + margin, Math.min(halfDepth - margin, pos.z))
+    const clampToWalls = () => {
+      pos.x = Math.max(-halfWidth + margin, Math.min(halfWidth - margin, pos.x))
+      pos.z = Math.max(-halfDepth + margin, Math.min(halfDepth - margin, pos.z))
+    }
+    clampToWalls()
     for (const c of opts.collisions ?? []) {
       const dx = pos.x - c.x
       const dz = pos.z - c.z
@@ -114,6 +117,9 @@ export function createWalkControls(
         pos.z += (dz / dist) * push
       }
     }
+    // Furniture push-out can shove a position back past a wall (e.g. bumping
+    // furniture that sits close to a wall) -- re-clamp so walls always win.
+    clampToWalls()
   }
 
   function update(dt: number) {
