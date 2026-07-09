@@ -66,13 +66,66 @@ const STATION_HOUSE: RoomTemplate = {
   palette: { floorBase: '#100c09', wallBase: '#182527', trim: '#2be3b8' },
 }
 
-/** Populated incrementally -- Broadcast Loft and Greenhouse Archive are
- * built in a later pass (each needs its own hand-placed layout + an
- * overlap audit, same as Station House got). Partial (not a full Record)
- * so referencing an unbuilt template is a caught error, not silent
- * undefined access. */
+const BROADCAST_LOFT: RoomTemplate = {
+  id: 'broadcast-loft',
+  name: 'Broadcast Loft',
+  // Studio/DJ-booth feel: a broadcast console on the east wall (desk+chair+
+  // deskLamp) flanked by a "record wall" (both bookcases), a lounge pit
+  // center-west, a daybed nook on the west wall instead of a full bed
+  // corner, tvStand repurposed as a mixing-console stand near the door.
+  props: [
+    { id: 'door', model: 'doorwayOpen.glb', position: [0, 3.4], rotationY: 0, collisionRadius: 0 },
+    { id: 'window', model: 'wallWindow.glb', position: [0, -3.4], rotationY: Math.PI, collisionRadius: 0 },
+    { id: 'bed', model: 'bedSingle.glb', position: [-3.4, -2.2], rotationY: Math.PI / 2, collisionRadius: 0.9 },
+    { id: 'nightstand', model: 'sideTable.glb', position: [-3.4, -0.3], rotationY: Math.PI / 2, collisionRadius: 0.6 },
+    { id: 'lamp', model: 'lampRoundFloor.glb', position: [-1.9, -2.9], rotationY: 0, collisionRadius: 0 },
+    { id: 'desk', model: 'desk.glb', position: [3.2, -1.0], rotationY: -Math.PI / 2, collisionRadius: 0.9 },
+    { id: 'chair', model: 'chairDesk.glb', position: [1.4, -0.6], rotationY: Math.PI / 2, collisionRadius: 0.55 },
+    { id: 'deskLamp', model: 'lampSquareTable.glb', position: [3.9, -1.7], rotationY: 0, collisionRadius: 0 },
+    { id: 'bookshelf', model: 'bookcaseClosed.glb', position: [4.0, -2.6], rotationY: -Math.PI / 2, collisionRadius: 0.55 },
+    { id: 'shelf', model: 'bookcaseOpenLow.glb', position: [4.0, 0.6], rotationY: -Math.PI / 2, collisionRadius: 0.55 },
+    { id: 'armchair', model: 'loungeChair.glb', position: [-2.5, 1.4], rotationY: Math.PI / 4, collisionRadius: 0.7 },
+    { id: 'table', model: 'table.glb', position: [-0.6, 2.2], rotationY: 0, collisionRadius: 0.85 },
+    { id: 'rug', model: 'rugRectangle.glb', position: [-1.6, 1.5], rotationY: 0, collisionRadius: 0 },
+    { id: 'mirror', model: 'bathroomMirror.glb', position: [-4.35, 2.6], rotationY: Math.PI / 2, collisionRadius: 0 },
+    { id: 'tvStand', model: 'cabinetTelevision.glb', position: [1.8, 3.0], rotationY: Math.PI, collisionRadius: 0.75 },
+    { id: 'plant', model: 'pottedPlant.glb', position: [4.0, 3.0], rotationY: 0, collisionRadius: 0 },
+  ],
+  palette: { floorBase: '#0c0c0e', wallBase: '#1a1420', trim: '#ff3d81' },
+}
+
+const GREENHOUSE_ARCHIVE: RoomTemplate = {
+  id: 'greenhouse-archive',
+  name: 'Greenhouse Archive',
+  // Warm reading-room feel: table+armchair+rug as the dominant central
+  // living zone, both bookcases doubled along the east wall as a real
+  // archive, desk moved to a window-side writing nook, bed kept as a
+  // simple corner cot, plant given a prominent window-side placement.
+  props: [
+    { id: 'door', model: 'doorwayOpen.glb', position: [0, 3.4], rotationY: 0, collisionRadius: 0 },
+    { id: 'window', model: 'wallWindow.glb', position: [0, -3.4], rotationY: Math.PI, collisionRadius: 0 },
+    { id: 'bed', model: 'bedSingle.glb', position: [-3.4, 2.6], rotationY: Math.PI / 2, collisionRadius: 0.9 },
+    { id: 'nightstand', model: 'sideTable.glb', position: [-3.4, 0.7], rotationY: Math.PI / 2, collisionRadius: 0.6 },
+    { id: 'lamp', model: 'lampRoundFloor.glb', position: [-2.0, 1.6], rotationY: 0, collisionRadius: 0 },
+    { id: 'desk', model: 'desk.glb', position: [-3.2, -2.8], rotationY: 0, collisionRadius: 0.9 },
+    { id: 'chair', model: 'chairDesk.glb', position: [-2.0, -1.2], rotationY: Math.PI, collisionRadius: 0.55 },
+    { id: 'deskLamp', model: 'lampSquareTable.glb', position: [-2.2, -3.1], rotationY: 0, collisionRadius: 0 },
+    { id: 'bookshelf', model: 'bookcaseClosed.glb', position: [4.0, -3.0], rotationY: -Math.PI / 2, collisionRadius: 0.55 },
+    { id: 'shelf', model: 'bookcaseOpenLow.glb', position: [4.0, -1.5], rotationY: -Math.PI / 2, collisionRadius: 0.55 },
+    { id: 'armchair', model: 'loungeChair.glb', position: [-1.2, 0.6], rotationY: Math.PI / 4, collisionRadius: 0.7 },
+    { id: 'table', model: 'table.glb', position: [0.6, 1.4], rotationY: 0, collisionRadius: 0.85 },
+    { id: 'rug', model: 'rugRectangle.glb', position: [-0.3, 1.0], rotationY: 0, collisionRadius: 0 },
+    { id: 'mirror', model: 'bathroomMirror.glb', position: [4.35, 2.8], rotationY: -Math.PI / 2, collisionRadius: 0 },
+    { id: 'tvStand', model: 'cabinetTelevision.glb', position: [2.0, 3.0], rotationY: Math.PI, collisionRadius: 0.75 },
+    { id: 'plant', model: 'pottedPlant.glb', position: [2.0, -3.1], rotationY: 0, collisionRadius: 0 },
+  ],
+  palette: { floorBase: '#3d2b12', wallBase: '#dce3c4', trim: '#c9a24b' },
+}
+
 const TEMPLATES: Partial<Record<RoomTemplateId, RoomTemplate>> = {
   'station-house': STATION_HOUSE,
+  'broadcast-loft': BROADCAST_LOFT,
+  'greenhouse-archive': GREENHOUSE_ARCHIVE,
 }
 
 export function getTemplate(id: RoomTemplateId): RoomTemplate {
