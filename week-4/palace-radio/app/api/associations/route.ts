@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
 Use these locations as loci (in order): ${loci.join(', ')}.
 
-For each locus, give one short, vivid, sensory association (one sentence) — visual or slightly silly so it's easy to recall. Output valid JSON only:
+For each locus, give one short, vivid, sensory association (one sentence) — visual or slightly silly so it's easy to recall. Describe something ADDED to the scene at that spot (an object placed there, a creature perched on it, an action happening around it) rather than a change to the locus's own surface or material — avoid things like cracks in the door, a brand burned into the lamp, a stain on the shelf, since the room shows a plain, unaltered version of each piece of furniture and a described surface change won't match what's actually there. Output valid JSON only:
 {"associations":[{"locus":"...","item":"...","sentence":"..."}, ...]}
 
 Match the number of associations to the number of loci. If the user gave a list, assign each list item to a locus in order. If they gave a topic, break it into that many key items.${excludeClause}`
