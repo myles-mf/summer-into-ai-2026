@@ -7,7 +7,7 @@
  * instead of a floating glyph, so the room shows *something built*, not
  * just an icon. Every emoji NOT in this vocabulary falls back to the flat
  * sprite (three-scene.ts owns that fallback branch, not this file) — this
- * is a curated ~18-shape library, not full emoji coverage, by design.
+ * is a curated ~36-shape library, not full emoji coverage, by design.
  *
  * No dependency on three-scene.ts (kept a leaf module, like cipher.ts /
  * wav.ts / palace-library.ts). Every builder call constructs fresh
@@ -200,6 +200,242 @@ function buildBell(): THREE.Object3D {
   return group(body, rim, clapper, loop)
 }
 
+function buildCat(): THREE.Object3D {
+  const bodyMat = mat('#8a8a8f', { roughness: 0.6, metalness: 0.05 })
+  const body = mesh(new THREE.SphereGeometry(0.1, 10, 8), bodyMat)
+  body.scale.set(1.3, 0.85, 1)
+  const head = mesh(new THREE.SphereGeometry(0.07, 10, 8), bodyMat, [0, 0.09, 0.13])
+  const earL = mesh(new THREE.ConeGeometry(0.025, 0.05, 4), bodyMat, [-0.045, 0.16, 0.15], [0, 0, -0.3])
+  const earR = mesh(new THREE.ConeGeometry(0.025, 0.05, 4), bodyMat, [0.045, 0.16, 0.15], [0, 0, 0.3])
+  const tail = mesh(new THREE.CylinderGeometry(0.012, 0.02, 0.18, 6), bodyMat, [0, 0.02, -0.16], [0.9, 0, 0])
+  return group(body, head, earL, earR, tail)
+}
+
+function buildDog(): THREE.Object3D {
+  const bodyMat = mat('#b8895a', { roughness: 0.65, metalness: 0.05 })
+  const body = mesh(new THREE.SphereGeometry(0.11, 10, 8), bodyMat)
+  body.scale.set(1.4, 0.9, 1)
+  const head = mesh(new THREE.SphereGeometry(0.075, 10, 8), bodyMat, [0, 0.08, 0.15])
+  const snout = mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.06, 8), bodyMat, [0, 0.06, 0.22], [Math.PI / 2, 0, 0])
+  const earL = mesh(new THREE.BoxGeometry(0.025, 0.06, 0.015), bodyMat, [-0.055, 0.12, 0.13], [0, 0, -0.2])
+  const earR = mesh(new THREE.BoxGeometry(0.025, 0.06, 0.015), bodyMat, [0.055, 0.12, 0.13], [0, 0, 0.2])
+  const tail = mesh(new THREE.CylinderGeometry(0.015, 0.025, 0.16, 6), bodyMat, [0, 0.05, -0.18], [-0.6, 0, 0])
+  return group(body, head, snout, earL, earR, tail)
+}
+
+function buildFrog(): THREE.Object3D {
+  const bodyMat = mat('#5fae4a', { roughness: 0.55, metalness: 0.02, emissive: '#3a7a2a', emissiveIntensity: 0.15 })
+  const body = mesh(new THREE.SphereGeometry(0.11, 10, 8), bodyMat)
+  body.scale.set(1.2, 0.7, 1.3)
+  const eyeL = mesh(new THREE.SphereGeometry(0.025, 8, 6), bodyMat, [-0.05, 0.09, 0.08])
+  const eyeR = mesh(new THREE.SphereGeometry(0.025, 8, 6), bodyMat, [0.05, 0.09, 0.08])
+  const legL = mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.1, 6), bodyMat, [-0.08, -0.05, -0.05], [0, 0, 0.6])
+  const legR = mesh(new THREE.CylinderGeometry(0.015, 0.02, 0.1, 6), bodyMat, [0.08, -0.05, -0.05], [0, 0, -0.6])
+  return group(body, eyeL, eyeR, legL, legR)
+}
+
+function buildFish(): THREE.Object3D {
+  const bodyMat = mat('#4aa8d8', { roughness: 0.3, metalness: 0.2, emissive: '#4aa8d8', emissiveIntensity: 0.25 })
+  const body = mesh(new THREE.SphereGeometry(0.1, 10, 8), bodyMat)
+  body.scale.set(1.5, 0.6, 0.7)
+  const tailFin = mesh(new THREE.ConeGeometry(0.06, 0.1, 4), bodyMat, [-0.15, 0, 0], [0, 0, -Math.PI / 2])
+  tailFin.scale.set(1, 1, 0.2)
+  const dorsalFin = mesh(new THREE.ConeGeometry(0.03, 0.05, 4), bodyMat, [0, 0.08, 0])
+  return group(body, tailFin, dorsalFin)
+}
+
+/** Stylized -- real wings have a curved membrane, not renderable cleanly
+ * with rigid primitives at this scale. Four flattened, angled spheres
+ * (a big pair + a small pair) plus a thin dark body read as "butterfly." */
+function buildButterfly(): THREE.Object3D {
+  const wingMat = mat('#e07ad0', { roughness: 0.4, metalness: 0.1, emissive: '#e07ad0', emissiveIntensity: 0.4, transparent: true, opacity: 0.9 })
+  const body = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.12, 6), mat('#2a2018', { roughness: 0.7, metalness: 0 }))
+  const wingTopL = mesh(new THREE.SphereGeometry(0.06, 8, 6), wingMat, [-0.05, 0.03, 0], [0, 0.3, 0])
+  wingTopL.scale.set(1, 0.6, 0.15)
+  const wingTopR = mesh(new THREE.SphereGeometry(0.06, 8, 6), wingMat, [0.05, 0.03, 0], [0, -0.3, 0])
+  wingTopR.scale.set(1, 0.6, 0.15)
+  const wingBottomL = mesh(new THREE.SphereGeometry(0.04, 8, 6), wingMat, [-0.04, -0.03, 0], [0, 0.3, 0])
+  wingBottomL.scale.set(1, 0.6, 0.15)
+  const wingBottomR = mesh(new THREE.SphereGeometry(0.04, 8, 6), wingMat, [0.04, -0.03, 0], [0, -0.3, 0])
+  wingBottomR.scale.set(1, 0.6, 0.15)
+  return group(body, wingTopL, wingTopR, wingBottomL, wingBottomR)
+}
+
+/** A curved TubeGeometry along a hand-authored S-curve, not a chain of
+ * primitives -- Three.js supports this natively and it reads as a real
+ * snake silhouette instead of a lumpy bead chain. */
+function buildSnake(): THREE.Object3D {
+  const snakeMat = mat('#4a8a4f', { roughness: 0.5, metalness: 0.1 })
+  const curve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-0.12, 0, 0),
+    new THREE.Vector3(-0.06, 0, 0.04),
+    new THREE.Vector3(0, 0, -0.03),
+    new THREE.Vector3(0.06, 0.015, 0.03),
+    new THREE.Vector3(0.12, 0.03, 0),
+  ])
+  const body = mesh(new THREE.TubeGeometry(curve, 20, 0.018, 8, false), snakeMat)
+  const head = mesh(new THREE.SphereGeometry(0.028, 8, 6), snakeMat, [0.12, 0.03, 0])
+  return group(body, head)
+}
+
+function buildTurtle(): THREE.Object3D {
+  const shell = mesh(
+    new THREE.SphereGeometry(0.1, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    mat('#3f7a45', { roughness: 0.6, metalness: 0.05 })
+  )
+  shell.scale.set(1, 0.6, 1)
+  const head = mesh(new THREE.SphereGeometry(0.035, 8, 6), mat('#6a9a5a', { roughness: 0.6, metalness: 0.02 }), [0, 0, 0.11])
+  const legMat = mat('#5a8a52', { roughness: 0.6, metalness: 0.02 })
+  const legFL = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.04, 6), legMat, [-0.08, -0.03, 0.06])
+  const legFR = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.04, 6), legMat, [0.08, -0.03, 0.06])
+  const legBL = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.04, 6), legMat, [-0.08, -0.03, -0.06])
+  const legBR = mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.04, 6), legMat, [0.08, -0.03, -0.06])
+  return group(shell, head, legFL, legFR, legBL, legBR)
+}
+
+function buildMouse(): THREE.Object3D {
+  const bodyMat = mat('#9a9a9a', { roughness: 0.6, metalness: 0.05 })
+  const body = mesh(new THREE.SphereGeometry(0.07, 10, 8), bodyMat)
+  body.scale.set(1.2, 0.9, 1)
+  const head = mesh(new THREE.SphereGeometry(0.045, 8, 6), bodyMat, [0, 0.02, 0.08])
+  const earL = mesh(new THREE.SphereGeometry(0.025, 8, 6), bodyMat, [-0.03, 0.06, 0.08])
+  earL.scale.set(1, 1, 0.4)
+  const earR = mesh(new THREE.SphereGeometry(0.025, 8, 6), bodyMat, [0.03, 0.06, 0.08])
+  earR.scale.set(1, 1, 0.4)
+  const tail = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.15, 4), mat('#c9a2a2', { roughness: 0.7, metalness: 0 }), [0, -0.01, -0.1], [1.4, 0, 0])
+  return group(body, head, earL, earR, tail)
+}
+
+function buildBee(): THREE.Object3D {
+  const bodyMat = mat('#f2c230', { roughness: 0.4, metalness: 0.1, emissive: '#f2c230', emissiveIntensity: 0.3 })
+  const stripeMat = mat('#2a2018', { roughness: 0.5, metalness: 0.05 })
+  const body = mesh(new THREE.SphereGeometry(0.06, 10, 8), bodyMat)
+  body.scale.set(1.3, 1, 1)
+  const stripe1 = mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.018, 10), stripeMat, [-0.02, 0, 0], [0, 0, Math.PI / 2])
+  const stripe2 = mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.018, 10), stripeMat, [0.02, 0, 0], [0, 0, Math.PI / 2])
+  const wingMat = mat('#eaf6ff', { roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.55 })
+  const wingL = mesh(new THREE.SphereGeometry(0.035, 8, 6), wingMat, [-0.02, 0.05, 0], [0, 0, 0.4])
+  wingL.scale.set(1, 0.3, 0.7)
+  const wingR = mesh(new THREE.SphereGeometry(0.035, 8, 6), wingMat, [0.02, 0.05, 0], [0, 0, -0.4])
+  wingR.scale.set(1, 0.3, 0.7)
+  return group(body, stripe1, stripe2, wingL, wingR)
+}
+
+function buildLadybug(): THREE.Object3D {
+  const shellMat = mat('#d8302a', { roughness: 0.35, metalness: 0.1, emissive: '#d8302a', emissiveIntensity: 0.3 })
+  const body = mesh(new THREE.SphereGeometry(0.08, 10, 8), shellMat)
+  body.scale.set(1, 0.7, 1.2)
+  const head = mesh(new THREE.SphereGeometry(0.035, 8, 6), mat('#1a1a1a', { roughness: 0.4, metalness: 0.1 }), [0, 0.01, 0.08])
+  const spotMat = mat('#1a1a1a', { roughness: 0.4, metalness: 0.1 })
+  const spots = [
+    [-0.03, 0.05, 0.02],
+    [0.03, 0.05, 0.02],
+    [-0.035, 0.05, -0.04],
+    [0.035, 0.05, -0.04],
+    [0, 0.06, -0.08],
+  ].map(([x, y, z]) => mesh(new THREE.SphereGeometry(0.012, 6, 6), spotMat, [x, y, z]))
+  return group(body, head, ...spots)
+}
+
+function buildClock(): THREE.Object3D {
+  const faceMat = mat('#f2ead8', { roughness: 0.5, metalness: 0.1 })
+  const brassMat = new THREE.MeshStandardMaterial(BRASS)
+  const face = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16), faceMat, undefined, [Math.PI / 2, 0, 0])
+  const rim = mesh(new THREE.TorusGeometry(0.1, 0.008, 8, 16), brassMat, undefined, [Math.PI / 2, 0, 0])
+  const handHour = mesh(new THREE.BoxGeometry(0.008, 0.045, 0.01), mat('#2a2018', { roughness: 0.7, metalness: 0 }), [0, 0.02, 0.017], [0, 0, -0.7])
+  const handMin = mesh(new THREE.BoxGeometry(0.006, 0.07, 0.008), mat('#2a2018', { roughness: 0.7, metalness: 0 }), [0, 0.03, 0.018], [0, 0, 1.9])
+  return group(face, rim, handHour, handMin)
+}
+
+function buildFlower(): THREE.Object3D {
+  const stem = mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.22, 6), mat('#4a8a4f', { roughness: 0.6, metalness: 0.02 }), [0, -0.11, 0])
+  const center = mesh(
+    new THREE.SphereGeometry(0.025, 8, 6),
+    mat('#f2c230', { emissive: '#f2c230', emissiveIntensity: 0.3, roughness: 0.4, metalness: 0.1 }),
+    [0, 0.02, 0]
+  )
+  const petalMat = mat('#f28ab0', { roughness: 0.4, metalness: 0.05, emissive: '#f28ab0', emissiveIntensity: 0.2 })
+  const petals: THREE.Mesh[] = []
+  for (let i = 0; i < 6; i++) {
+    const angle = i * (Math.PI / 3)
+    const petal = mesh(new THREE.SphereGeometry(0.03, 8, 6), petalMat, [Math.cos(angle) * 0.04, 0.02, Math.sin(angle) * 0.04], [0, angle, 0])
+    petal.scale.set(1.6, 0.5, 1)
+    petals.push(petal)
+  }
+  return group(stem, center, ...petals)
+}
+
+/** The classic two-lobes-plus-cone trick for a heart silhouette. */
+function buildHeart(): THREE.Object3D {
+  const heartMat = mat('#e8304f', { roughness: 0.35, metalness: 0.1, emissive: '#e8304f', emissiveIntensity: 0.35 })
+  const lobeL = mesh(new THREE.SphereGeometry(0.06, 10, 8), heartMat, [-0.035, 0.03, 0])
+  const lobeR = mesh(new THREE.SphereGeometry(0.06, 10, 8), heartMat, [0.035, 0.03, 0])
+  const bottom = mesh(new THREE.ConeGeometry(0.075, 0.11, 10), heartMat, [0, -0.06, 0], [Math.PI, 0, 0])
+  return group(lobeL, lobeR, bottom)
+}
+
+function buildCrown(): THREE.Object3D {
+  const crownMat = new THREE.MeshStandardMaterial(BRASS)
+  const base = mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.05, 12, 1, true), crownMat)
+  const gemMat = mat('#4fd0ff', { emissive: '#4fd0ff', emissiveIntensity: 0.6, roughness: 0.2, metalness: 0.4 })
+  const spikes: THREE.Mesh[] = []
+  const gems: THREE.Mesh[] = []
+  for (let i = 0; i < 5; i++) {
+    const angle = i * ((2 * Math.PI) / 5)
+    const r = 0.095
+    const spike = mesh(new THREE.ConeGeometry(0.02, 0.06, 4), crownMat, [Math.cos(angle) * r, 0.05, Math.sin(angle) * r])
+    spikes.push(spike)
+    const gem = mesh(new THREE.SphereGeometry(0.012, 6, 6), gemMat, [Math.cos(angle) * r, 0.08, Math.sin(angle) * r])
+    gems.push(gem)
+  }
+  return group(base, ...spikes, ...gems)
+}
+
+function buildApple(): THREE.Object3D {
+  const body = mesh(new THREE.SphereGeometry(0.1, 12, 10), mat('#d8302a', { roughness: 0.35, metalness: 0.05 }))
+  body.scale.set(1, 0.95, 1)
+  const stem = mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.05, 6), mat('#5a3a20', { roughness: 0.7, metalness: 0 }), [0, 0.1, 0])
+  const leaf = mesh(new THREE.SphereGeometry(0.025, 8, 6), mat('#4a8a4f', { roughness: 0.5, metalness: 0.02 }), [0.02, 0.11, 0], [0, 0.5, 0])
+  leaf.scale.set(1.6, 0.3, 1)
+  return group(body, stem, leaf)
+}
+
+function buildGift(): THREE.Object3D {
+  const boxMat = mat('#c93838', { roughness: 0.5, metalness: 0.05 })
+  const ribbonMat = mat('#f2ead8', { roughness: 0.5, metalness: 0.1 })
+  const box = mesh(new THREE.BoxGeometry(0.16, 0.14, 0.16), boxMat)
+  const ribbonV = mesh(new THREE.BoxGeometry(0.03, 0.15, 0.17), ribbonMat)
+  const ribbonH = mesh(new THREE.BoxGeometry(0.17, 0.15, 0.03), ribbonMat)
+  const bowL = mesh(new THREE.TorusGeometry(0.025, 0.008, 6, 10), ribbonMat, [-0.02, 0.08, 0], [Math.PI / 2, 0.5, 0])
+  const bowR = mesh(new THREE.TorusGeometry(0.025, 0.008, 6, 10), ribbonMat, [0.02, 0.08, 0], [Math.PI / 2, -0.5, 0])
+  return group(box, ribbonV, ribbonH, bowL, bowR)
+}
+
+function buildMushroom(): THREE.Object3D {
+  const cap = mesh(
+    new THREE.SphereGeometry(0.09, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    mat('#d8302a', { roughness: 0.5, metalness: 0.02 }),
+    [0, 0.02, 0]
+  )
+  cap.scale.set(1, 0.7, 1)
+  const stem = mesh(new THREE.CylinderGeometry(0.03, 0.035, 0.12, 10), mat('#f2ead8', { roughness: 0.6, metalness: 0.02 }), [0, -0.09, 0])
+  const spotMat = mat('#f2ead8', { roughness: 0.5, metalness: 0 })
+  const spots = [
+    [0, 0.09, 0],
+    [-0.045, 0.06, 0.02],
+    [0.045, 0.06, -0.02],
+    [0, 0.06, 0.05],
+  ].map(([x, y, z]) => mesh(new THREE.SphereGeometry(0.012, 6, 6), spotMat, [x, y, z]))
+  return group(cap, stem, ...spots)
+}
+
+function buildIceCube(): THREE.Object3D {
+  return mesh(
+    new THREE.BoxGeometry(0.14, 0.14, 0.14),
+    mat('#bfe8f5', { roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.55, emissive: '#bfe8f5', emissiveIntensity: 0.2 })
+  )
+}
+
 export const EMOJI_DECORATIONS: Record<string, DecorationBuilder> = {
   '💡': buildLightbulb,
   '🎈': buildBalloon,
@@ -219,6 +455,24 @@ export const EMOJI_DECORATIONS: Record<string, DecorationBuilder> = {
   '🌵': buildCactus,
   '⚙️': buildGear,
   '🔔': buildBell,
+  '🐱': buildCat,
+  '🐶': buildDog,
+  '🐸': buildFrog,
+  '🐟': buildFish,
+  '🦋': buildButterfly,
+  '🐍': buildSnake,
+  '🐢': buildTurtle,
+  '🐭': buildMouse,
+  '🐝': buildBee,
+  '🐞': buildLadybug,
+  '⏰': buildClock,
+  '🌸': buildFlower,
+  '❤️': buildHeart,
+  '👑': buildCrown,
+  '🍎': buildApple,
+  '🎁': buildGift,
+  '🍄': buildMushroom,
+  '🧊': buildIceCube,
 }
 
 export function buildDecoration(emoji: string): THREE.Object3D | null {
