@@ -21,7 +21,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ROOM } from './nodes'
 import type { RoomTemplate } from './house'
-import { PROP_SURFACE_Y } from './house'
+import { PROP_SURFACE_Y, PROP_XZ_OFFSET } from './house'
 import type { ClaimedNode } from './claim'
 import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
@@ -612,8 +612,15 @@ export function createScene(
       if (emoji) {
         const decoration = buildDecoration(emoji)
         if (decoration) {
+          // Kenney's kit pivots many pieces at a base corner/edge, not the
+          // geometric center, so a decoration placed at the raw prop
+          // position alone hangs off one side of the furniture -- rotate
+          // the model's own local center offset by the SAME rotationY
+          // already applied to pulseGroup before adding it to world space.
+          const [offX, offZ] = PROP_XZ_OFFSET[prop.id] ?? [0, 0]
+          const rotatedOffset = new THREE.Vector3(offX, 0, offZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotationY)
           const anchorY = PROP_SURFACE_Y[prop.id] ?? 2.0
-          decoration.position.set(x, anchorY, z)
+          decoration.position.set(x + rotatedOffset.x, anchorY, z + rotatedOffset.z)
           decoration.userData.bobPhase = Math.random() * Math.PI * 2
           decoration.userData.baseY = anchorY
           houseGroup.add(decoration)
