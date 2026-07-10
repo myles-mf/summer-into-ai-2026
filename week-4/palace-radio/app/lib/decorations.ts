@@ -436,6 +436,77 @@ function buildIceCube(): THREE.Object3D {
   )
 }
 
+/** Stylized -- one sphere covers basketball/soccer-ball/tennis-ball/globe
+ * alike; surface markings (seams, continents) aren't worth a texture pass
+ * for a claimed-prop decoration this small. */
+function buildBall(): THREE.Object3D {
+  return mesh(new THREE.SphereGeometry(0.14, 16, 12), mat('#d8722a', { roughness: 0.55, metalness: 0.05 }))
+}
+
+/** Three overlapping soft spheres is the standard "cloud" silhouette trick. */
+function buildCloud(): THREE.Object3D {
+  const cloudMat = mat('#f2f2ea', { roughness: 0.75, metalness: 0.02, emissive: '#dcdcd0', emissiveIntensity: 0.15 })
+  const core = mesh(new THREE.SphereGeometry(0.1, 10, 8), cloudMat)
+  core.scale.set(1.4, 0.85, 1)
+  const left = mesh(new THREE.SphereGeometry(0.075, 8, 6), cloudMat, [-0.1, -0.01, 0])
+  left.scale.set(1, 0.85, 1)
+  const right = mesh(new THREE.SphereGeometry(0.08, 8, 6), cloudMat, [0.1, 0.015, 0])
+  right.scale.set(1, 0.9, 1)
+  return group(core, left, right)
+}
+
+/** A round head plus a few TubeGeometry-along-a-curve tentacles, reusing
+ * buildSnake's curved-tube technique at smaller scale and multiplied --
+ * cheaper and more organic-looking than modeling true jointed legs. */
+function buildOctopus(): THREE.Object3D {
+  const skinMat = mat('#c9539a', { roughness: 0.45, metalness: 0.08, emissive: '#c9539a', emissiveIntensity: 0.2 })
+  const head = mesh(new THREE.SphereGeometry(0.095, 12, 10), skinMat, [0, 0.04, 0])
+  head.scale.set(1, 0.9, 1)
+  const eyeMat = mat('#1a1a1a', { roughness: 0.4, metalness: 0.1 })
+  const eyeL = mesh(new THREE.SphereGeometry(0.014, 6, 6), eyeMat, [-0.04, 0.07, 0.075])
+  const eyeR = mesh(new THREE.SphereGeometry(0.014, 6, 6), eyeMat, [0.04, 0.07, 0.075])
+  const tentacleCount = 5
+  const tentacles: THREE.Mesh[] = []
+  for (let i = 0; i < tentacleCount; i++) {
+    const angle = (i / tentacleCount) * Math.PI * 2
+    const baseX = Math.cos(angle) * 0.06
+    const baseZ = Math.sin(angle) * 0.06
+    const curve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(baseX, -0.03, baseZ),
+      new THREE.Vector3(baseX * 1.6, -0.1, baseZ * 1.6),
+      new THREE.Vector3(baseX * 1.3, -0.16, baseZ * 1.3 + Math.sin(angle) * 0.03),
+      new THREE.Vector3(baseX * 1.8, -0.2, baseZ * 1.8),
+    ])
+    tentacles.push(mesh(new THREE.TubeGeometry(curve, 12, 0.012, 6, false), skinMat))
+  }
+  return group(head, eyeL, eyeR, ...tentacles)
+}
+
+function buildRobot(): THREE.Object3D {
+  const bodyMat = mat('#9aa0a8', { roughness: 0.4, metalness: 0.55 })
+  const body = mesh(new THREE.BoxGeometry(0.14, 0.16, 0.09), bodyMat)
+  const head = mesh(new THREE.BoxGeometry(0.1, 0.09, 0.09), bodyMat, [0, 0.13, 0])
+  const eyeMat = mat('#4fd0ff', { emissive: '#4fd0ff', emissiveIntensity: 0.7, roughness: 0.25, metalness: 0.2 })
+  const eyeL = mesh(new THREE.SphereGeometry(0.014, 6, 6), eyeMat, [-0.025, 0.135, 0.046])
+  const eyeR = mesh(new THREE.SphereGeometry(0.014, 6, 6), eyeMat, [0.025, 0.135, 0.046])
+  const antenna = mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 6), bodyMat, [0, 0.2, 0])
+  const antennaTip = mesh(new THREE.SphereGeometry(0.014, 6, 6), eyeMat, [0, 0.225, 0])
+  const armL = mesh(new THREE.BoxGeometry(0.03, 0.1, 0.03), bodyMat, [-0.09, 0.01, 0])
+  const armR = mesh(new THREE.BoxGeometry(0.03, 0.1, 0.03), bodyMat, [0.09, 0.01, 0])
+  return group(body, head, eyeL, eyeR, antenna, antennaTip, armL, armR)
+}
+
+/** A single flattened, angled sphere (reusing buildFlower's petal-shape
+ * trick: sphere squashed thin on one axis) plus a thin center vein reads
+ * as a leaf silhouette without a bespoke extruded shape. */
+function buildLeaf(): THREE.Object3D {
+  const leafMat = mat('#4a9a4f', { roughness: 0.55, metalness: 0.02, emissive: '#3a7a2a', emissiveIntensity: 0.15 })
+  const blade = mesh(new THREE.SphereGeometry(0.11, 10, 8), leafMat, undefined, [0, 0, Math.PI / 5])
+  blade.scale.set(1.8, 0.9, 0.12)
+  const vein = mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.18, 4), mat('#2f6a34', { roughness: 0.6, metalness: 0 }), [0, 0, 0.005], [0, 0, Math.PI / 5])
+  return group(blade, vein)
+}
+
 export const EMOJI_DECORATIONS: Record<string, DecorationBuilder> = {
   '💡': buildLightbulb,
   '🎈': buildBalloon,
@@ -473,9 +544,131 @@ export const EMOJI_DECORATIONS: Record<string, DecorationBuilder> = {
   '🎁': buildGift,
   '🍄': buildMushroom,
   '🧊': buildIceCube,
+  '🏀': buildBall,
+  '☁️': buildCloud,
+  '🐙': buildOctopus,
+  '🤖': buildRobot,
+  '🌿': buildLeaf,
+}
+
+/**
+ * Tier 2 -- real usage showed the exact-match vocabulary above rarely fires:
+ * the AI correctly picks the SPECIFIC accurate emoji for its sentence (a
+ * flamingo is a flamingo, not our generic bird), and there are effectively
+ * unlimited specific emoji it might reach for, so exact-only matching left
+ * almost everything falling back to a flat icon even though the AI's picks
+ * were perfectly accurate. This routes many more emoji to the CLOSEST
+ * existing shape above -- a real object, just not species-exact -- without
+ * needing hundreds more bespoke builders. Every value here must be a key
+ * that exists in EMOJI_DECORATIONS.
+ */
+export const EMOJI_ALIASES: Record<string, string> = {
+  // bird family -> buildBird
+  '🦜': '🐦', // parrot
+  '🦩': '🐦', // flamingo
+  '🕊️': '🐦', // dove / pigeon
+  '🦉': '🐦', // owl
+  '🐧': '🐦', // penguin
+  '🦆': '🐦', // duck
+  '🦅': '🐦', // eagle
+  '🦢': '🐦', // swan
+  '🐔': '🐦', // chicken
+  '🐓': '🐦', // rooster
+  '🦃': '🐦', // turkey
+  '🦚': '🐦', // peacock
+  '🐤': '🐦', // baby chick
+  '🐣': '🐦', // hatching chick
+  '🐥': '🐦', // front-facing chick
+
+  // small mammal / rodent -> buildMouse
+  '🐰': '🐭', // rabbit
+  '🐇': '🐭', // rabbit (alt)
+  '🐹': '🐭', // hamster
+  '🐿️': '🐭', // squirrel
+  '🦔': '🐭', // hedgehog
+
+  // generic 4-legged land animal -> buildDog (accepted simplification --
+  // same order of stylization as this file's moon/star/gear shapes)
+  '🦁': '🐶', // lion
+  '🐯': '🐶', // tiger
+  '🐅': '🐶', // tiger (alt)
+  '🐆': '🐶', // leopard
+  '🐻': '🐶', // bear
+  '🐮': '🐶', // cow
+  '🐄': '🐶', // cow (alt)
+  '🐷': '🐶', // pig
+  '🐖': '🐶', // pig (alt)
+  '🐴': '🐶', // horse
+  '🐎': '🐶', // horse (alt)
+  '🦊': '🐶', // fox
+  '🐺': '🐶', // wolf
+  '🦌': '🐶', // deer
+  '🐐': '🐶', // goat
+  '🐑': '🐶', // sheep
+  '🐵': '🐶', // monkey
+  '🙈': '🐶', // monkey (see-no-evil)
+  '🙉': '🐶', // monkey (hear-no-evil)
+  '🙊': '🐶', // monkey (speak-no-evil)
+  '🐘': '🐶', // elephant -- a real proportion mismatch, accepted deliberately
+  '🦓': '🐶', // zebra
+  '🦏': '🐶', // rhino
+  '🦛': '🐶', // hippo
+  '🐫': '🐶', // camel
+  '🐪': '🐶', // dromedary
+
+  // ball family -> buildBall
+  '⚽': '🏀',
+  '🎾': '🏀',
+  '🏐': '🏀', // volleyball
+  '🏈': '🏀', // football
+  '⚾': '🏀', // baseball
+  '🌍': '🏀', // globe (Europe/Africa)
+  '🌎': '🏀', // globe (Americas)
+  '🌏': '🏀', // globe (Asia/Australia)
+
+  // cloud/sky -> buildCloud
+  '🌤️': '☁️',
+  '⛅': '☁️',
+  '🌥️': '☁️',
+  '🌦️': '☁️',
+  '🌫️': '☁️', // fog
+
+  // tentacled sea creature -> buildOctopus
+  '🦑': '🐙', // squid
+
+  // plant/leaf -> buildLeaf (🌵 cactus and 🌸 flower already exact, not duplicated)
+  '🍃': '🌿',
+  '☘️': '🌿',
+  '🍀': '🌿',
+  '🌱': '🌿', // seedling
+
+  // other aquatic -> buildFish
+  '🐬': '🐟', // dolphin
+  '🐳': '🐟', // whale
+  '🐋': '🐟', // whale (alt)
+  '🦈': '🐟', // shark
+  '🦐': '🐟', // shrimp
+  '🦞': '🐟', // lobster
+  '🦀': '🐟', // crab
+
+  // round fruit -> buildApple
+  '🍊': '🍎', // orange
+  '🍋': '🍎', // lemon
+  '🍑': '🍎', // peach
+  '🍒': '🍎', // cherries
+  '🍇': '🍎', // grapes
+  '🍐': '🍎', // pear
+
+  // household/misc -> nearest existing shape (deliberately loose)
+  '🕹️': '⚙️', // joystick -> gear
+  '📱': '⚙️', // phone -> gear
+  '🧭': '⏰', // compass -> clock
 }
 
 export function buildDecoration(emoji: string): THREE.Object3D | null {
-  const builder = EMOJI_DECORATIONS[emoji]
-  return builder ? builder() : null
+  const exact = EMOJI_DECORATIONS[emoji]
+  if (exact) return exact()
+  const canonicalKey = EMOJI_ALIASES[emoji]
+  const aliased = canonicalKey ? EMOJI_DECORATIONS[canonicalKey] : undefined
+  return aliased ? aliased() : null
 }
