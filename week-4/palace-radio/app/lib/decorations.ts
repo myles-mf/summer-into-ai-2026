@@ -665,10 +665,45 @@ export const EMOJI_ALIASES: Record<string, string> = {
   '🧭': '⏰', // compass -> clock
 }
 
-export function buildDecoration(emoji: string): THREE.Object3D | null {
+/** Tints a freshly-built decoration to the AI's stated color ("a PINK
+ * flamingo" should not render blue). Heuristic: the largest mesh by scaled
+ * bounding volume is the body; because nearly every builder shares one
+ * material across its body parts (bird body+head+tail, robot body+head+arms),
+ * re-coloring that one material re-colors the whole creature while leaving
+ * accents (brass base, black eyes, wick) alone. Safe to mutate: every
+ * builder call constructs fresh material instances, never shared singletons. */
+function tintPrimary(root: THREE.Object3D, hex: string) {
+  let best: THREE.Mesh | null = null
+  let bestVol = -1
+  root.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (!(m as unknown as { isMesh?: boolean }).isMesh || !m.geometry) return
+    m.geometry.computeBoundingBox()
+    const s = new THREE.Vector3()
+    m.geometry.boundingBox!.getSize(s)
+    const vol = s.x * m.scale.x * (s.y * m.scale.y) * (s.z * m.scale.z)
+    if (vol > bestVol) {
+      bestVol = vol
+      best = m
+    }
+  })
+  if (!best) return
+  const material = (best as THREE.Mesh).material as THREE.MeshStandardMaterial
+  material.color.set(hex)
+  // A glowing primary (fire, gem, star) glows in its own color -- keep the
+  // glow consistent with the new tint instead of leaving the old hue behind.
+  if (material.emissive && material.emissive.r + material.emissive.g + material.emissive.b > 0.01) {
+    material.emissive.set(hex)
+  }
+}
+
+export function buildDecoration(emoji: string, color?: string): THREE.Object3D | null {
   const exact = EMOJI_DECORATIONS[emoji]
-  if (exact) return exact()
   const canonicalKey = EMOJI_ALIASES[emoji]
-  const aliased = canonicalKey ? EMOJI_DECORATIONS[canonicalKey] : undefined
-  return aliased ? aliased() : null
+  const builder = exact ?? (canonicalKey ? EMOJI_DECORATIONS[canonicalKey] : undefined)
+  if (!builder) return null
+  const obj = builder()
+  const trimmed = color?.trim()
+  if (trimmed && /^#[0-9a-fA-F]{6}$/.test(trimmed)) tintPrimary(obj, trimmed)
+  return obj
 }

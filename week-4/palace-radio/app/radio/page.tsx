@@ -165,7 +165,7 @@ function RadioContent() {
   return (
     <main className="min-h-screen flex flex-col md:flex-row">
       <div className="relative h-[52vh] md:h-screen flex-1">
-        <PalaceScene ref={sceneRef} claimed={claimed} template={template} />
+        <PalaceScene ref={sceneRef} claimed={claimed} template={template} palaceId={palace?.id} />
         <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm rounded px-2 py-1">
           <Link href="/" className="text-xs text-[var(--fg-dim)] hover:text-[var(--amber)]">
             ← Palace Radio

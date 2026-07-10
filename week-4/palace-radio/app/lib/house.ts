@@ -183,36 +183,11 @@ export const PROP_SURFACE_Y: Record<string, number> = {
   plant: 0.85,
 }
 
-/** Local (unrotated) XZ offset, meters post GLOBAL_SCALE, from a prop's own
- * pivot to its model's real visual/footprint center -- measured the same
- * way as PROP_SURFACE_Y (an offline GLTF bounding-box script), because
- * Kenney's kit pivots many pieces at a base corner/edge rather than the
- * geometric center (a common grid-snapping convention for game-asset kits),
- * so decorations placed at the raw prop position alone hang off one side
- * of the furniture instead of sitting centered on it. `bed`/`rug` are the
- * largest corrections (roughly half their own footprint size -- consistent
- * with a corner-pivoted model, not a measurement error). This offset is in
- * the MODEL's local space -- three-scene.ts must rotate it by the prop's
- * own rotationY (same transform already applied to pulseGroup) before
- * adding it to a world position; adding it unrotated would make rotated
- * props worse, not better. If any prop still looks off after applying
- * this, tune that one entry directly (same posture as PROP_SURFACE_Y's
- * chair/armchair estimates) rather than distrusting the whole table. */
-export const PROP_XZ_OFFSET: Record<string, [number, number]> = {
-  door: [0.49, -0.09],
-  window: [1.0, -0.05],
-  bed: [1.51, -1.89],
-  nightstand: [0.51, -0.2],
-  lamp: [0.12, -0.12],
-  desk: [0.71, -0.2],
-  chair: [0.14, -0.12],
-  deskLamp: [0.12, -0.12],
-  bookshelf: [0.4, -0.25],
-  shelf: [0.4, -0.25],
-  armchair: [0.49, -0.41],
-  table: [0.84, -0.45],
-  rug: [1.57, -0.92],
-  mirror: [0.3, 0.05],
-  tvStand: [0.8, -0.25],
-  plant: [0.17, -0.19],
-}
+// NOTE: a PROP_XZ_OFFSET table briefly lived here (commit 9d2f17c),
+// correcting for "corner-pivoted" models measured from the raw .glb files.
+// It was wrong-premised and has been removed: model-glyph.ts's loadModel()
+// already re-centers every model on its pivot at load time
+// (instance.position.x -= center.x, etc.), so the rendered furniture was
+// never off-center -- the offsets pushed decorations onto each piece's EDGE
+// (offset == exactly half the footprint). Decorations belong at the raw
+// prop position.

@@ -9,15 +9,15 @@ export type PalaceSceneHandle = SceneAPI
 
 const PalaceScene = forwardRef<
   PalaceSceneHandle,
-  { claimed: ClaimedNode[]; template: RoomTemplate; onPick?: (propId: string) => void }
->(function PalaceScene({ claimed, template, onPick }, ref) {
+  { claimed: ClaimedNode[]; template: RoomTemplate; onPick?: (propId: string) => void; palaceId?: string }
+>(function PalaceScene({ claimed, template, onPick, palaceId }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const apiRef = useRef<SceneAPI | null>(null)
-    const claimedKey = claimed.map((c) => c.prop.id).join('|') + '::' + template.id
+    const claimedKey = claimed.map((c) => c.prop.id).join('|') + '::' + template.id + '::' + (palaceId ?? '')
 
     useEffect(() => {
       if (!canvasRef.current) return
-      const api = createScene(canvasRef.current, claimed, template, onPick)
+      const api = createScene(canvasRef.current, claimed, template, onPick, palaceId)
       apiRef.current = api
       // ResizeObserver (not a window 'resize' listener) so the camera's
       // aspect ratio is corrected the moment the canvas gets its real

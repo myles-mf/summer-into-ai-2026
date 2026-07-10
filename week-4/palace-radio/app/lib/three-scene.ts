@@ -21,11 +21,13 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ROOM } from './nodes'
 import type { RoomTemplate } from './house'
-import { PROP_SURFACE_Y, PROP_XZ_OFFSET } from './house'
+import { PROP_SURFACE_Y } from './house'
 import type { ClaimedNode } from './claim'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
 import { buildDecoration } from './decorations'
+import { getModel, modelKey } from './model-store'
 
 export type SceneAPI = {
   setActive: (propId: string | null) => void
@@ -322,8 +324,13 @@ function disposeObject3D(root: THREE.Object3D) {
     const m = obj as THREE.Mesh
     if (m.geometry) m.geometry.dispose()
     const material = m.material
-    if (Array.isArray(material)) material.forEach((mm) => mm.dispose())
-    else if (material) (material as THREE.Material).dispose()
+    const disposeMat = (mm: THREE.Material) => {
+      const tex = (mm as THREE.MeshStandardMaterial).map
+      if (tex) tex.dispose() // generated GLBs carry real textures, unlike the primitives
+      mm.dispose()
+    }
+    if (Array.isArray(material)) material.forEach(disposeMat)
+    else if (material) disposeMat(material as THREE.Material)
   })
 }
 
@@ -331,7 +338,8 @@ export function createScene(
   canvas: HTMLCanvasElement,
   claimed: ClaimedNode[],
   template: RoomTemplate,
-  onPick?: (propId: string) => void
+  onPick?: (propId: string) => void,
+  palaceId?: string
 ): SceneAPI {
   const TRIM = new THREE.Color(template.palette.trim)
   const DIM_TRIM = TRIM.clone().multiplyScalar(0.4)
@@ -533,6 +541,12 @@ export function createScene(
   const emojiMats: THREE.SpriteMaterial[] = []
   const emojiTextures: THREE.Texture[] = []
   const decorationRoots: THREE.Object3D[] = []
+  // Per-prop handles so an AI-sculpted model arriving async can replace
+  // whatever placeholder (primitive shape or flat sprite) that spot got.
+  const decorationByProp = new Map<string, THREE.Object3D>()
+  const spriteByProp = new Map<string, THREE.Sprite>()
+  const gltfLoader = new GLTFLoader()
+  let disposed = false
 
   template.props.forEach((prop) => {
     const [x, z] = prop.position
@@ -610,21 +624,17 @@ export function createScene(
       // this is a curated ~18-shape library, not full emoji coverage).
       const emoji = claimedByPropId.get(prop.id)?.emoji
       if (emoji) {
-        const decoration = buildDecoration(emoji)
+        const decoration = buildDecoration(emoji, claimedByPropId.get(prop.id)?.color)
         if (decoration) {
-          // Kenney's kit pivots many pieces at a base corner/edge, not the
-          // geometric center, so a decoration placed at the raw prop
-          // position alone hangs off one side of the furniture -- rotate
-          // the model's own local center offset by the SAME rotationY
-          // already applied to pulseGroup before adding it to world space.
-          const [offX, offZ] = PROP_XZ_OFFSET[prop.id] ?? [0, 0]
-          const rotatedOffset = new THREE.Vector3(offX, 0, offZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), prop.rotationY)
+          // The raw prop position IS the furniture's visual center --
+          // loadModel() re-centers every model on its pivot at load time.
           const anchorY = PROP_SURFACE_Y[prop.id] ?? 2.0
-          decoration.position.set(x + rotatedOffset.x, anchorY, z + rotatedOffset.z)
+          decoration.position.set(x, anchorY, z)
           decoration.userData.bobPhase = Math.random() * Math.PI * 2
           decoration.userData.baseY = anchorY
           houseGroup.add(decoration)
           decorationRoots.push(decoration)
+          decorationByProp.set(prop.id, decoration)
         } else {
           const emojiTex = emojiTexture(emoji)
           const emojiMat = new THREE.SpriteMaterial({ map: emojiTex, transparent: true, depthTest: false })
@@ -635,7 +645,61 @@ export function createScene(
           houseGroup.add(emojiSprite)
           emojiMats.push(emojiMat)
           emojiTextures.push(emojiTex)
+          spriteByProp.set(prop.id, emojiSprite)
         }
+      }
+
+      // An AI-sculpted model for this exact palace+spot (Materialize, see
+      // model-gen.ts) trumps both fallbacks. Checked async against
+      // IndexedDB: absent for shared-link recipients and never-materialized
+      // palaces, in which case whatever rendered above simply stays.
+      if (palaceId) {
+        getModel(modelKey(palaceId, prop.id)).then((bytes) => {
+          if (!bytes || disposed) return
+          gltfLoader.parse(
+            bytes,
+            '',
+            (gltf) => {
+              if (disposed) {
+                disposeObject3D(gltf.scene)
+                return
+              }
+              const obj = gltf.scene
+              // Generated meshes come at arbitrary scale -- normalize to a
+              // small-object size (per-object normalize is CORRECT here,
+              // unlike the furniture kit where it destroyed proportions).
+              const box = new THREE.Box3().setFromObject(obj)
+              const size = box.getSize(new THREE.Vector3())
+              const maxDim = Math.max(size.x, size.y, size.z) || 1
+              obj.scale.setScalar(0.45 / maxDim)
+              obj.updateMatrixWorld(true)
+              const scaled = new THREE.Box3().setFromObject(obj)
+              const center = scaled.getCenter(new THREE.Vector3())
+              obj.position.x -= center.x
+              obj.position.z -= center.z
+              obj.position.y -= scaled.min.y // bottom sits at wrapper origin
+              const wrapper = new THREE.Group()
+              wrapper.add(obj)
+              const anchorY = PROP_SURFACE_Y[prop.id] ?? 2.0
+              wrapper.position.set(x, anchorY, z)
+              wrapper.userData.bobPhase = Math.random() * Math.PI * 2
+              wrapper.userData.baseY = anchorY
+              const prevDecoration = decorationByProp.get(prop.id)
+              if (prevDecoration) {
+                houseGroup.remove(prevDecoration)
+                const idx = decorationRoots.indexOf(prevDecoration)
+                if (idx >= 0) decorationRoots.splice(idx, 1)
+                disposeObject3D(prevDecoration)
+              }
+              const prevSprite = spriteByProp.get(prop.id)
+              if (prevSprite) houseGroup.remove(prevSprite) // disposal stays with emojiMats/emojiTextures
+              houseGroup.add(wrapper)
+              decorationRoots.push(wrapper)
+              decorationByProp.set(prop.id, wrapper)
+            },
+            () => {} // parse failure -> keep the fallback silently
+          )
+        })
       }
     }
   })
@@ -817,6 +881,7 @@ export function createScene(
   }
 
   function dispose() {
+    disposed = true // stops in-flight sculpted-model loads from re-adding to a dead scene
     cancelAnimationFrame(raf)
     walker.dispose()
     renderer.dispose()

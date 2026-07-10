@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { listPalaces, deletePalace, wingCount, type PalaceMeta } from './lib/palace-library'
+import { deleteModelsFor } from './lib/model-store'
 
 const TEMPLATE_LABEL: Record<PalaceMeta['templateId'], string> = {
   'station-house': 'Station House',
@@ -21,6 +22,7 @@ export default function HomePage() {
 
   function handleDelete(id: string) {
     deletePalace(id)
+    void deleteModelsFor(id) // sculpted GLBs for this palace; fire-and-forget
     setPalaces(listPalaces())
     setConfirmingDelete(null)
   }

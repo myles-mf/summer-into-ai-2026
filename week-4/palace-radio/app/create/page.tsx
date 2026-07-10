@@ -6,9 +6,13 @@ import { useRouter } from 'next/navigation'
 import type { Association } from '../lib/palace'
 import { createPalace, savePalace, wingCount, PROPS_PER_WING, type RoomTemplateId, type StoredPalace } from '../lib/palace-library'
 import { listTemplates, templateLoci, DEFAULT_TEMPLATE_ID } from '../lib/house'
+import { materialize, getUserKey, setUserKey, type GenState } from '../lib/model-gen'
 
 type Step = 'choose' | 'topic' | 'done'
 const MAX_WINGS = 4
+/** Free-tier (our Tripo key) materialization is limited to small rooms --
+ * the shared credit pack is finite. Bigger rooms need the visitor's own key. */
+const FREE_GEN_MAX_ITEMS = 6
 
 export default function CreatePage() {
   const router = useRouter()
@@ -30,6 +34,30 @@ export default function CreatePage() {
   const [associations, setAssociations] = useState<Association[] | null>(null)
   const [palace, setPalace] = useState<StoredPalace | null>(null)
   const [addingWing, setAddingWing] = useState(false)
+
+  const [genStates, setGenStates] = useState<Record<string, GenState>>({})
+  const [genRunning, setGenRunning] = useState(false)
+  const [userKey, setUserKeyState] = useState(() => getUserKey())
+  const [showKeyInput, setShowKeyInput] = useState(false)
+
+  function saveUserKey(key: string) {
+    setUserKey(key)
+    setUserKeyState(key.trim())
+  }
+
+  async function runMaterialize() {
+    if (!palace || !associations || genRunning) return
+    // Model-store keys are palaceId:locus, and loci repeat across wings --
+    // materialization is scoped to single-wing palaces (the panel is hidden
+    // for multi-wing ones below).
+    const targets = associations.slice(0, PROPS_PER_WING)
+    setGenRunning(true)
+    setGenStates(Object.fromEntries(targets.map((a) => [a.locus, 'pending' as GenState])))
+    await materialize(palace.id, targets, userKey, (locus, state) =>
+      setGenStates((s) => ({ ...s, [locus]: state }))
+    )
+    setGenRunning(false)
+  }
 
   function pickTemplate(id: RoomTemplateId) {
     setTemplateId(id)
@@ -207,7 +235,10 @@ export default function CreatePage() {
               />
 
               <label className="block text-sm font-bold">What do you want to remember?</label>
-              <p className="text-xs text-[var(--fg-dim)]">A topic, or a short list — one item lands on each beacon.</p>
+              <p className="text-xs text-[var(--fg-dim)]">
+                A topic, or a short list — one item lands on each beacon. Keep it to {FREE_GEN_MAX_ITEMS} or fewer
+                to qualify for free AI-sculpted 3D objects afterwards.
+              </p>
               <div className="flex flex-wrap gap-2">
                 {['the first 5 elements of the periodic table', 'the quadratic formula', 'five Spanish words for colors'].map((ex) => (
                   <button
@@ -252,10 +283,82 @@ export default function CreatePage() {
                   <span className="text-[var(--amber)] font-bold">{a.locus}</span>
                   <span className="text-[var(--fg-dim)]"> → </span>
                   <span>{a.emoji ? a.emoji + ' ' : ''}{a.item}</span>
+                  {genStates[a.locus] && (
+                    <span
+                      className={`ml-2 text-xs ${
+                        genStates[a.locus] === 'done'
+                          ? 'text-[var(--teal)]'
+                          : genStates[a.locus] === 'failed'
+                            ? 'text-[var(--redact)]'
+                            : 'text-[var(--fg-dim)]'
+                      }`}
+                    >
+                      {genStates[a.locus] === 'pending' && '· queued'}
+                      {genStates[a.locus] === 'sculpting' && '· sculpting…'}
+                      {genStates[a.locus] === 'done' && '· ✦ sculpted'}
+                      {genStates[a.locus] === 'failed' && '· kept the simple shape'}
+                    </span>
+                  )}
                   <p className="mt-1 text-sm italic text-[var(--fg-dim)]">&ldquo;{a.sentence}&rdquo;</p>
                 </li>
               ))}
             </ul>
+
+            {currentWings === 1 && (
+              <div className="panel crt p-4 mt-6">
+                <span className="font-bold text-[var(--amber)]">⚡ Materialize objects (AI 3D)</span>
+                <p className="mt-1 text-xs text-[var(--fg-dim)]">
+                  Sculpt each item&apos;s vivid detail into a real, unique 3D object in your room (~30s each).
+                  {!userKey && ` Free on the house for rooms of ${FREE_GEN_MAX_ITEMS} items or fewer, while the free pool lasts.`}
+                  {userKey && ' Using your Tripo key — your account, your cost.'}
+                </p>
+                {associations.length > FREE_GEN_MAX_ITEMS && !userKey && (
+                  <p className="mt-2 text-xs text-[var(--redact)]">
+                    This room has {associations.length} items — the free tier covers rooms of {FREE_GEN_MAX_ITEMS} or fewer.
+                    Paste your own Tripo key below to sculpt bigger rooms.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={runMaterialize}
+                  disabled={genRunning || (associations.length > FREE_GEN_MAX_ITEMS && !userKey)}
+                  className="btn mt-3 !text-xs"
+                >
+                  {genRunning ? 'Sculpting…' : '⚡ Materialize'}
+                </button>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowKeyInput((v) => !v)}
+                    className="text-xs text-[var(--teal)] hover:underline"
+                  >
+                    {userKey ? 'Using your own Tripo key ▾' : 'Use your own Tripo API key ▾'}
+                  </button>
+                  {showKeyInput && (
+                    <div className="mt-2">
+                      <p className="text-xs text-[var(--fg-dim)]">
+                        Stays in this browser only (localStorage); sent per-request straight through to Tripo,
+                        never stored on our server. Get one at platform.tripo3d.ai.
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="password"
+                          defaultValue={userKey}
+                          placeholder="tsk_..."
+                          onBlur={(e) => saveUserKey(e.target.value)}
+                          className="flex-1 bg-[var(--panel-2)] border border-[var(--line)] px-2 py-1 text-xs text-[var(--paper)] placeholder-[var(--fg-dim)] focus:border-[var(--teal)] focus:outline-none"
+                        />
+                        {userKey && (
+                          <button type="button" onClick={() => saveUserKey('')} className="btn btn--ghost !text-xs">
+                            clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {currentWings < MAX_WINGS && (
               <button type="button" onClick={addWing} disabled={addingWing} className="btn btn--ghost mt-4 !text-xs">

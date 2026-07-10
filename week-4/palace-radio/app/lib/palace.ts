@@ -5,7 +5,7 @@
  * silently overwrote itself on every new palace, which is exactly the
  * problem palace-library.ts replaced.
  */
-export type Association = { locus: string; item: string; sentence: string; emoji?: string }
+export type Association = { locus: string; item: string; sentence: string; emoji?: string; color?: string }
 
 /** Fixture used by the headless self-test harness (window.__palace) */
 export const SAMPLE_PALACE = {
@@ -14,7 +14,7 @@ export const SAMPLE_PALACE = {
     { locus: 'door', item: 'Hydrogen', sentence: 'A single lightbulb hangs where the door should be — one proton, one electron, one filament.', emoji: '💡' },
     { locus: 'desk', item: 'Helium', sentence: 'Two balloons are tied to the desk lamp, tugging it toward the ceiling.', emoji: '🎈' },
     { locus: 'window', item: 'Lithium', sentence: 'A battery is wedged in the window frame, sparking against the glass.', emoji: '🔋' },
-    { locus: 'bed', item: 'Beryllium', sentence: 'A green emerald sits on the pillow, cool and heavy.', emoji: '💎' },
+    { locus: 'bed', item: 'Beryllium', sentence: 'A green emerald sits on the pillow, cool and heavy.', emoji: '💎', color: '#2ecc71' },
     { locus: 'shelf', item: 'Boron', sentence: 'A small box of borax detergent is tucked on the shelf.', emoji: '📦' },
   ] as Association[],
 }
