@@ -150,3 +150,35 @@ export function templateLoci(id: RoomTemplateId): string[] {
 /** Back-compat: the canonical prop-id vocabulary is the same across every
  * template (see file header), so any one template's ids represent it. */
 export const HOUSE_WORDS = STATION_HOUSE.props.map((p) => p.id)
+
+/** Real-world Y height (meters, post GLOBAL_SCALE -- see model-glyph.ts) a
+ * decoration should sit at to read as "resting on this prop" rather than
+ * floating near the ceiling. One table shared across every template, since
+ * they all use the same canonical prop-id vocabulary and the same models.
+ * `bed`/`nightstand`/`desk`/`table`/`tvStand`/`shelf`/`bookshelf` are real
+ * measured top-surface heights (a scratch GLTF bounding-box script parsed
+ * each .glb's raw geometry). `chair`/`armchair` are engineering ESTIMATES,
+ * not measurements: their models' bounding-box max-Y is the backrest top,
+ * not the seat plane, which the measurement script can't isolate -- these
+ * two are the most likely to need a follow-up numeric tweak after a visual
+ * check. The rest aren't real "surfaces" (door, window, lamp, deskLamp,
+ * mirror, rug) -- reasonable fixed placements (eye-level near wall fixtures,
+ * near a lamp's shade, just above the floor for a rug). */
+export const PROP_SURFACE_Y: Record<string, number> = {
+  door: 1.3,
+  window: 1.1,
+  bed: 0.75,
+  nightstand: 0.77,
+  lamp: 1.4,
+  desk: 0.77,
+  chair: 0.48,
+  deskLamp: 0.55,
+  bookshelf: 1.7,
+  shelf: 0.8,
+  armchair: 0.42,
+  table: 0.65,
+  rug: 0.05,
+  mirror: 1.4,
+  tvStand: 0.62,
+  plant: 0.85,
+}

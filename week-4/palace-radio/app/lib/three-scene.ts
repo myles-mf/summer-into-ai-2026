@@ -21,6 +21,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ROOM } from './nodes'
 import type { RoomTemplate } from './house'
+import { PROP_SURFACE_Y } from './house'
 import type { ClaimedNode } from './claim'
 import { loadModel } from './model-glyph'
 import { createWalkControls } from './walk-controls'
@@ -611,8 +612,10 @@ export function createScene(
       if (emoji) {
         const decoration = buildDecoration(emoji)
         if (decoration) {
-          decoration.position.set(x, 2.0, z)
+          const anchorY = PROP_SURFACE_Y[prop.id] ?? 2.0
+          decoration.position.set(x, anchorY, z)
           decoration.userData.bobPhase = Math.random() * Math.PI * 2
+          decoration.userData.baseY = anchorY
           houseGroup.add(decoration)
           decorationRoots.push(decoration)
         } else {
@@ -768,8 +771,12 @@ export function createScene(
 
     decorationRoots.forEach((obj) => {
       const phase = obj.userData.bobPhase as number
-      obj.rotation.y = t * 0.5 + phase
-      obj.position.y = 2.0 + Math.sin(t * 1.1 + phase) * 0.035
+      const baseY = obj.userData.baseY as number
+      // A full continuous spin read fine for a floating icon, but a cat/apple/gift
+      // now resting AT furniture height shouldn't spin in place like a music-box
+      // novelty -- a gentle sway plus a subtle bob reads as "sitting there," not orbiting.
+      obj.rotation.y = Math.sin(t * 0.6 + phase) * 0.35
+      obj.position.y = baseY + Math.sin(t * 1.1 + phase) * 0.025
     })
 
     if (flyTarget && flyLookAt) {
