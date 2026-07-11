@@ -20,16 +20,17 @@ never in the code, never in this repo, never sent to the browser.
    - `OPENAI_API_KEY` — your OpenAI key. Apply to Production (and Preview).
    - Optional: `KEEPER_VOICE` (default `onyx`) — any OpenAI TTS voice name.
    - Optional: `AI_MAX_TOKENS` (default `512`/`300` depending on the route).
-   - Optional: `TRIPO_API_KEY` — a Tripo3D key (platform.tripo3d.ai) that powers
-     the free tier of **AI-sculpted 3D objects** ("Materialize"). **Spend-cap
-     posture is different from OpenAI**: Tripo has no per-key or account spend
-     cap, so buy a FIXED prepaid credit pack (e.g. ~$20 ≈ 2,000 credits ≈ 100
-     textured objects at 20 credits each) and leave **auto-refill OFF** — the
-     pack itself is the hard cap; when it's spent, free materialization simply
-     returns an error and users can continue with their own key. The proxy also
-     applies a small per-IP daily quota. Without this env var, Materialize
-     shows "TRIPO_API_KEY is not set" for our-key requests but still works for
-     users who paste their own key.
+   - Optional: `TRIPO_API_KEY` + `NEXT_PUBLIC_MATERIALIZE=1` — enables
+     **AI-sculpted 3D objects** ("Materialize"). The UI is hidden unless
+     `NEXT_PUBLIC_MATERIALIZE=1` is set, so the live site never shows a
+     free-tier button that isn't actually funded — set BOTH vars together
+     once the Tripo account is ready. Get the key at platform.tripo3d.ai.
+     **Spend-cap posture is different from OpenAI**: Tripo has no per-key or
+     account spend cap, so buy a FIXED prepaid credit pack (e.g. ~$20 ≈ 2,000
+     credits ≈ 100 textured objects at 20 credits each) and leave
+     **auto-refill OFF** — the pack itself is the hard cap; when it's spent,
+     free materialization simply returns an error and users can continue with
+     their own key. The proxy also applies a small per-IP daily quota.
 
 4. **Deploy.** Vercel builds it and gives you a URL like
    `https://palace-radio-xyz.vercel.app`. That URL is your **proof link** —

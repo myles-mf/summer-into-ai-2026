@@ -13,6 +13,12 @@ const MAX_WINGS = 4
 /** Free-tier (our Tripo key) materialization is limited to small rooms --
  * the shared credit pack is finite. Bigger rooms need the visitor's own key. */
 const FREE_GEN_MAX_ITEMS = 6
+/** The whole Materialize UI is gated off until TRIPO_API_KEY is actually
+ * funded and set on the deploy -- otherwise the live site would show a
+ * "free on the house" button that errors. Flip NEXT_PUBLIC_MATERIALIZE=1
+ * (plus TRIPO_API_KEY) in Vercel to turn the feature on; the full pipeline
+ * behind it ships either way. */
+const MATERIALIZE_ENABLED = process.env.NEXT_PUBLIC_MATERIALIZE === '1'
 
 export default function CreatePage() {
   const router = useRouter()
@@ -236,8 +242,9 @@ export default function CreatePage() {
 
               <label className="block text-sm font-bold">What do you want to remember?</label>
               <p className="text-xs text-[var(--fg-dim)]">
-                A topic, or a short list — one item lands on each beacon. Keep it to {FREE_GEN_MAX_ITEMS} or fewer
-                to qualify for free AI-sculpted 3D objects afterwards.
+                A topic, or a short list — one item lands on each beacon.
+                {MATERIALIZE_ENABLED &&
+                  ` Keep it to ${FREE_GEN_MAX_ITEMS} or fewer to qualify for free AI-sculpted 3D objects afterwards.`}
               </p>
               <div className="flex flex-wrap gap-2">
                 {['the first 5 elements of the periodic table', 'the quadratic formula', 'five Spanish words for colors'].map((ex) => (
@@ -304,7 +311,7 @@ export default function CreatePage() {
               ))}
             </ul>
 
-            {currentWings === 1 && (
+            {MATERIALIZE_ENABLED && currentWings === 1 && (
               <div className="panel crt p-4 mt-6">
                 <span className="font-bold text-[var(--amber)]">⚡ Materialize objects (AI 3D)</span>
                 <p className="mt-1 text-xs text-[var(--fg-dim)]">
