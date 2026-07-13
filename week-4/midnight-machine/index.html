@@ -657,6 +657,7 @@ function endGame(won){
         ? `You rode with the Crown frozen — so that was pure luck and reflex. Turn its mind back on and see how much faster it finds you.`
         : `It read you <b style="color:var(--gold)">${read}%</b> of the time by the end. It doesn't forget — but a fresh road resets its memory.`);
   if(won){ dawnBurst(); }
+  el('endcard').classList.remove('hide');   // actually show the end screen
 }
 function dawnBurst(){ const g=roadGeom(); for(let i=0;i<80;i++){ G.particles.push({x:Math.random()*W,y:H*0.4+Math.random()*H*0.4,vx:(Math.random()-0.5)*60,vy:-Math.random()*120-20,g:60,life:1.5+Math.random(),color:i%2?COL.warm:COL.gold,r:Math.random()*3+1}); } }
 
