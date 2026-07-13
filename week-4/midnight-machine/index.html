@@ -84,6 +84,19 @@
     width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#0008;color:var(--cream);
     font-family:'Anton';cursor:pointer;pointer-events:auto;font-size:15px}
   #info:hover{border-color:var(--gold);color:var(--gold)}
+  #mute{position:fixed;top:18px;left:calc(50% + 24px);z-index:30;
+    width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#0008;
+    cursor:pointer;pointer-events:auto;font-size:13px;line-height:1}
+  #mute:hover{border-color:var(--gold)}
+  #mute.off{opacity:.55}
+
+  /* Crown-learned-you readout on the end card */
+  #crownlearned{max-width:460px;margin:16px auto 4px;font-size:12px;color:#cfc9df;line-height:1.7;
+    border:1px solid var(--line);border-radius:8px;padding:12px 14px;background:#12183290}
+  #crownlearned:empty{display:none}
+  #crownlearned .cl-h{display:block;font-size:10px;letter-spacing:.16em;color:var(--teal);margin-bottom:6px}
+  #crownlearned b{color:var(--amber)}
+  #crownlearned .cl-s{color:var(--mut);font-style:italic}
 
   /* ── overlays ── */
   .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;
@@ -162,6 +175,7 @@
 </div>
 
 <button id="info" title="How it works">i</button>
+<button id="mute" title="Sound on/off">🔊</button>
 
 <!-- intro -->
 <div class="overlay" id="intro">
@@ -188,6 +202,7 @@
     <p class="end-stat">Score <b id="endscore">0</b></p>
     <p class="end-stat">Towns warned <b id="endwarned">0</b> &nbsp;·&nbsp; The Crown read you <b id="endread">0%</b> of the time</p>
     <p class="sub" id="endflavor"></p>
+    <div id="crownlearned"></div>
     <button class="btn" id="againbtn">RIDE AGAIN ▸</button>
     <div><button class="btn ghost" id="sharebtn">COPY THIS ROAD ▸</button></div>
     <p class="small">Best this session: <b style="color:var(--gold)" id="bestscore">0</b></p>
@@ -284,6 +299,48 @@ function roadGeom(){
 
 const COL = {red:'#c8322f', redDark:'#7a1e1c', blue:'#3c3b6e', cream:'#f4ecd8', gold:'#e0a72a', amber:'#ffb020', mud:'#5c4326', house:'#e7dcc2', roof:'#9c3b34', warm:'#ffcf70'};
 
+/* ---------- procedural sound (Web Audio, no asset files) ---------- */
+const Sound = {
+  ctx:null, master:null, hoofClock:0,
+  enabled: (typeof localStorage!=='undefined' && localStorage.getItem('mm-sound')==='off') ? false : true,
+  init(){
+    if(this.ctx) return;
+    try{
+      const AC = window.AudioContext||window.webkitAudioContext; if(!AC) return;
+      this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = this.enabled ? 0.85 : 0;
+      this.master.connect(this.ctx.destination);
+    }catch(e){}
+  },
+  resume(){ try{ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); }catch(e){} },
+  setEnabled(on){ this.enabled=on; try{localStorage.setItem('mm-sound', on?'on':'off');}catch(e){} if(this.master) this.master.gain.value = on?0.85:0; },
+  tone(freq,dur,type='sine',gain=0.3,slideTo=null){
+    if(!this.ctx||!this.enabled) return;
+    const t=this.ctx.currentTime, o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type; o.frequency.setValueAtTime(freq,t);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(20,slideTo), t+dur);
+    g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0008, t+dur);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t+dur+0.02);
+  },
+  noise(dur,gain=0.3,filterFreq=1200){
+    if(!this.ctx||!this.enabled) return;
+    const t=this.ctx.currentTime, n=Math.max(1,Math.floor(this.ctx.sampleRate*dur));
+    const buf=this.ctx.createBuffer(1,n,this.ctx.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<n;i++) d[i]=Math.random()*2-1;
+    const src=this.ctx.createBufferSource(); src.buffer=buf;
+    const f=this.ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=filterFreq;
+    const g=this.ctx.createGain(); g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0008,t+dur);
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t); src.stop(t+dur);
+  },
+  sThrow(){ this.tone(880,0.13,'triangle',0.2,240); },
+  sWarn(combo){ const b=520+Math.min(combo,8)*38; this.tone(b,0.19,'sine',0.26); this.tone(b*1.5,0.16,'sine',0.13); },
+  sCrash(){ this.noise(0.32,0.42,650); this.tone(130,0.34,'sawtooth',0.24,55); },
+  sNear(){ this.tone(1200,0.09,'square',0.1,1600); },
+  sHoof(){ this.noise(0.055,0.13,200); },
+  sDawn(){ [392,494,587,784].forEach((f,i)=> setTimeout(()=>this.tone(f,0.9,'sine',0.16), i*95)); },
+};
+
 // ---- game state ----
 let G = null;
 function newGame(seedStr){
@@ -312,6 +369,9 @@ function newGame(seedStr){
     predDist:[0.25,0.25,0.25,0.25], predLane:1,
     sky:0,             // 0 night -> 1 dawn
     shake:0,
+    timeScale:1,       // near-miss slow-mo
+    lastLaneChangeT:-9,
+    popups:[],         // {x,y,text,color,life,size}
   };
   const g=roadGeom(); G.rider.x=g.laneX(1);
   for(let i=0;i<90;i++){ G.stars.push({x:G.rng(), y:G.rng()*0.7, r:G.rng()*1.4+0.3, tw:G.rng()*6}); }
@@ -330,6 +390,10 @@ function stepLogic(dt){
   G.sky = Math.max(0, (prog-0.62)/0.38);   // dawn begins ~62% through
   if(G.invuln>0) G.invuln=Math.max(0,G.invuln-dt);
   if(G.shake>0) G.shake=Math.max(0,G.shake-dt*3);
+
+  // gallop hoofbeats, tempo rising with the ride
+  Sound.hoofClock -= dt;
+  if(Sound.hoofClock<=0){ Sound.hoofClock = 0.36 - 0.14*prog; Sound.sHoof(); }
 
   // win at dawn
   if(G.t>=G.duration){ endGame(true); return; }
@@ -387,6 +451,8 @@ function stepLogic(dt){
         const pts = 100 + G.combo*15;
         G.score += pts;
         spawnBurst(g.laneX(e.lane), e.y, COL.warm, 16);
+        Sound.sWarn(G.combo);
+        addPopup(g.laneX(e.lane), e.y-14, G.combo>=2? `+${pts}  x${G.combo}` : `+${pts}`, G.combo>=2?COL.gold:COL.warm, G.combo>=3?18:14);
         break;
       }
     }
@@ -403,8 +469,12 @@ function stepLogic(dt){
         G.crown.recordAccuracy(e.lane===G.rider.lane);
       }
       if(e.lane===G.rider.lane && G.invuln<=0){
-        // hit
         crash();
+      } else if(e.kind==='redcoat' && Math.abs(e.lane-G.rider.lane)===1 && (G.t-G.lastLaneChangeT)<0.5){
+        // last-frame dodge — juice it
+        G.timeScale=0.32; G.score+=25;
+        addPopup(G.rider.x, g.riderY-46, 'CLOSE!', COL.amber, 20);
+        Sound.sNear();
       }
     }
     if(e.kind==='house' && !e.scored && crossed){
@@ -420,12 +490,18 @@ function stepLogic(dt){
   // particles
   for(const p of G.particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=p.g*dt; p.life-=dt; }
   G.particles = G.particles.filter(p=>p.life>0);
+  // floating popups
+  for(const p of G.popups){ p.y-=34*dt; p.life-=dt; }
+  G.popups = G.popups.filter(p=>p.life>0);
 }
+
+function addPopup(x,y,text,color,size){ G.popups.push({x,y,text,color:color||COL.cream,size:size||14,life:0.9,max:0.9}); }
 
 function crash(){
   G.lives--; G.invuln=1.4; G.combo=0; G.shake=1;
   const g=roadGeom();
   spawnBurst(G.rider.x, g.riderY, COL.red, 22);
+  Sound.sCrash();
   updateLives();
   if(G.lives<=0){ endGame(false); }
 }
@@ -488,6 +564,19 @@ function render(){
 
   if(!G){ ctx.restore(); return; }
 
+  // speed lines — intensify with the ride (and the slow-mo makes them read)
+  {
+    const prog=Math.min(1,G.t/G.duration), n=Math.floor(6+prog*16), spd=(1.6-G.timeScale)*1.0+0.2;
+    ctx.strokeStyle='#e8ecff'; ctx.lineWidth=1.5;
+    for(let i=0;i<n;i++){
+      const seed=(i*97.13)%1, lx = rl+6 + ((seed*g.rw)|0)%(g.rw-12);
+      const yy = ((G.scroll*(3.2+spd) + i*137) % (H+120)) - 60, len=26+prog*40;
+      ctx.globalAlpha=(0.05+prog*0.12);
+      ctx.beginPath(); ctx.moveTo(lx,yy); ctx.lineTo(lx,yy+len); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
   // entities (far to near)
   const ents=[...G.entities].sort((a,b)=>a.y-b.y);
   for(const e of ents){
@@ -506,6 +595,18 @@ function render(){
   // particles
   for(const p of G.particles){ ctx.globalAlpha=Math.max(0,Math.min(1,p.life*2)); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.r,p.r);}
   ctx.globalAlpha=1;
+
+  // floating popups (+score / CLOSE!)
+  if(G.popups.length){
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const p of G.popups){
+      const a=Math.max(0,Math.min(1,p.life/p.max));
+      ctx.globalAlpha=a; ctx.fillStyle=p.color;
+      ctx.font=`700 ${p.size}px 'JetBrains Mono',monospace`;
+      ctx.fillText(p.text, p.x, p.y);
+    }
+    ctx.globalAlpha=1;
+  }
 
   // dawn wash
   if(sky>0){ ctx.fillStyle=`rgba(255,180,90,${sky*0.16})`; ctx.fillRect(0,0,W,H); }
@@ -604,7 +705,7 @@ function syncHUD(){
 let acc=0, lastT=performance.now();
 function frame(now){
   let dt=(now-lastT)/1000; lastT=now; if(dt>0.1) dt=0.1;
-  acc+=dt;
+  if(G){ if(G.timeScale<1) G.timeScale=Math.min(1,G.timeScale+dt*2.2); acc+=dt*G.timeScale; } else acc+=dt;
   while(acc>=DT){ stepLogic(DT); if(G && G.running && !G.over){ G.scroll += G.speed*DT; } acc-=DT; }
   render(); syncHUD();
   requestAnimationFrame(frame);
@@ -612,8 +713,8 @@ function frame(now){
 requestAnimationFrame(frame);
 
 /* ---------- input ---------- */
-function move(dir){ if(!G||!G.running||G.over) return; G.rider.lane=Math.max(0,Math.min(3,G.rider.lane+dir)); }
-function throwBroadside(){ if(!G||!G.running||G.over) return; if(G.broadsides.length>3) return; G.broadsides.push({lane:G.rider.lane, y:roadGeom().riderY-20}); }
+function move(dir){ if(!G||!G.running||G.over) return; const nl=Math.max(0,Math.min(3,G.rider.lane+dir)); if(nl!==G.rider.lane){ G.rider.lane=nl; G.lastLaneChangeT=G.t; } }
+function throwBroadside(){ if(!G||!G.running||G.over) return; if(G.broadsides.length>3) return; G.broadsides.push({lane:G.rider.lane, y:roadGeom().riderY-20}); Sound.sThrow(); }
 window.addEventListener('keydown', e=>{
   if(e.repeat) return;
   const k=e.key.toLowerCase();
@@ -634,10 +735,23 @@ el('freezebtn').addEventListener('click', toggleFreeze);
 /* ---------- flow ---------- */
 let best=0;
 function startGame(seedStr){
+  Sound.init(); Sound.resume();   // AudioContext needs a user gesture — this runs from the click
   newGame(seedStr);
   G.running=true;
   el('intro').classList.add('hide'); el('endcard').classList.add('hide');
   el('freezebtn').classList.remove('frozen'); el('freezebtn').textContent='❄ FREEZE THE CROWN';
+}
+// What the Crown actually learned about you, from its real transition counts.
+function crownProfile(){
+  const T=G.crown.trans, c=(i,j)=>Math.max(0,T[i][j]-1);  // strip the Laplace prior
+  const timeIn=[0,1,2,3].map(i=>c(i,0)+c(i,1)+c(i,2)+c(i,3));
+  const total=timeIn.reduce((a,b)=>a+b,0)||1;
+  let fav=0; for(let i=1;i<4;i++) if(timeIn[i]>timeIn[fav]) fav=i;
+  let stay=0,left=0,right=0;
+  for(let i=0;i<4;i++){ stay+=c(i,i); if(i>0) left+=c(i,i-1); if(i<3) right+=c(i,i+1); }
+  const moves=left+right;
+  return {fav:fav+1, stayPct:Math.round(stay/total*100), dir:moves?(left>=right?'LEFT':'RIGHT'):'—',
+          dirPct:moves?Math.round(Math.max(left,right)/moves*100):0, moves};
 }
 function endGame(won){
   if(G.over) return;
@@ -656,7 +770,12 @@ function endGame(won){
     : (G.frozen
         ? `You rode with the Crown frozen — so that was pure luck and reflex. Turn its mind back on and see how much faster it finds you.`
         : `It read you <b style="color:var(--gold)">${read}%</b> of the time by the end. It doesn't forget — but a fresh road resets its memory.`);
-  if(won){ dawnBurst(); }
+  // what the Crown learned about *you*
+  const p=crownProfile();
+  el('crownlearned').innerHTML = p.moves>3
+    ? `<span class="cl-h">◢ WHAT THE CROWN LEARNED ABOUT YOU</span>you lived in <b>lane ${p.fav}</b> &nbsp;·&nbsp; you bolted <b>${p.dir}</b> ${p.dirPct}% of the time &nbsp;·&nbsp; you held your lane ${p.stayPct}%<br><span class="cl-s">that's the habit it read.</span>`
+    : '';
+  if(won){ dawnBurst(); Sound.sDawn(); }
   el('endcard').classList.remove('hide');   // actually show the end screen
 }
 function dawnBurst(){ const g=roadGeom(); for(let i=0;i<80;i++){ G.particles.push({x:Math.random()*W,y:H*0.4+Math.random()*H*0.4,vx:(Math.random()-0.5)*60,vy:-Math.random()*120-20,g:60,life:1.5+Math.random(),color:i%2?COL.warm:COL.gold,r:Math.random()*3+1}); } }
@@ -669,9 +788,14 @@ el('sharebtn').addEventListener('click', ()=>{
 });
 el('info').addEventListener('click', ()=>{ if(G) G.running=false; el('intro').classList.remove('hide'); });
 
+/* ---------- mute toggle ---------- */
+function syncMute(){ el('mute').textContent = Sound.enabled ? '🔊' : '🔇'; el('mute').classList.toggle('off', !Sound.enabled); }
+el('mute').addEventListener('click', ()=>{ Sound.init(); Sound.setEnabled(!Sound.enabled); Sound.resume(); syncMute(); });
+syncMute();
+
 /* ---------- headless harness ---------- */
 window.__ride = {
-  makeCrown, benchmark, mulberry32,
+  makeCrown, benchmark, mulberry32, Sound, crownProfile,
   get state(){ return G; },
   simulate(seconds, opts){        // advance live logic headlessly
     opts=opts||{}; if(!G||G.over) newGame(opts.seed!=null?String(opts.seed):'test');
