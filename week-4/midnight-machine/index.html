@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>MIDNIGHT MACHINE — Paul Revere's ride, but the Crown learns you</title>
+<meta name="description" content="A one-file arcade ride where the British aren't scripted — they run a from-scratch learning model that adapts to how you play. Built on Adam's Ride, Revere, Ride! for Summer Into AI, Week 4." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --night:#0b1026; --night2:#141a38; --cream:#f4ecd8; --ink:#0a0d1c;
+    --red:#c8322f; --blue:#3c3b6e; --gold:#e0a72a; --amber:#ffb020;
+    --teal:#4fd6c9; --mut:#8a90b0; --line:#2a3057;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--night); color:var(--cream);
+    font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+    touch-action:none; user-select:none;
+  }
+  .display{font-family:'Anton',Impact,sans-serif;font-weight:400;letter-spacing:.02em;text-transform:uppercase;line-height:.92}
+  #wrap{position:fixed;inset:0}
+  canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+
+  /* film grain + halftone overlays */
+  #grain,#halftone{position:fixed;inset:0;pointer-events:none;mix-blend-mode:overlay}
+  #grain{opacity:.06;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>")}
+  #halftone{opacity:.05;background-image:radial-gradient(var(--cream) .7px, transparent .8px);background-size:5px 5px}
+
+  /* crop marks */
+  .crop{position:fixed;width:18px;height:18px;border:0 solid var(--cream);opacity:.35;pointer-events:none;z-index:40}
+  .crop.tl{top:12px;left:12px;border-top-width:2px;border-left-width:2px}
+  .crop.tr{top:12px;right:12px;border-top-width:2px;border-right-width:2px}
+  .crop.bl{bottom:12px;left:12px;border-bottom-width:2px;border-left-width:2px}
+  .crop.br{bottom:12px;right:12px;border-bottom-width:2px;border-right-width:2px}
+
+  /* ── HUD ── */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:20}
+  .row{position:absolute;display:flex;align-items:center;gap:14px}
+  #topbar{top:20px;left:24px;right:24px;justify-content:space-between}
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat .k{font-size:10px;letter-spacing:.18em;color:var(--mut)}
+  .stat .v{font-size:22px;font-variant-numeric:tabular-nums}
+  .stat .v.big{font-size:30px}
+  #lives{display:flex;gap:5px;font-size:20px}
+  .meter{width:150px;height:10px;background:#0006;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+  .meter i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--amber));transition:width .15s}
+  #dawnmeter i{background:linear-gradient(90deg,#3a4a8a,#ffd08a)}
+
+  /* Crown's Mind panel */
+  #crownpanel{position:fixed;right:24px;bottom:24px;z-index:22;width:186px;
+    background:linear-gradient(180deg,#141a38ee,#0b1026ee);border:1px solid var(--line);
+    border-radius:8px;padding:12px 12px 10px;pointer-events:auto;backdrop-filter:blur(3px)}
+  #crownpanel .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  #crownpanel .hd .t{font-size:10px;letter-spacing:.16em;color:var(--teal)}
+  #bars{display:flex;gap:6px;height:64px;align-items:flex-end}
+  .bar{flex:1;position:relative;background:#0007;border:1px solid var(--line);border-radius:2px 2px 0 0;height:100%;display:flex;align-items:flex-end;overflow:hidden}
+  .bar i{display:block;width:100%;background:linear-gradient(180deg,var(--red),#7a1e1c);transition:height .12s}
+  .bar.pred i{background:linear-gradient(180deg,var(--amber),var(--gold))}
+  .bar .lab{position:absolute;top:-15px;left:0;right:0;text-align:center;font-size:9px;color:var(--mut)}
+  #crownread{margin-top:9px;font-size:10px;color:var(--mut);display:flex;justify-content:space-between;align-items:center}
+  #crownread b{color:var(--cream);font-size:12px}
+  #freezebtn{margin-top:9px;width:100%;pointer-events:auto;cursor:pointer;
+    background:#0007;color:var(--cream);border:1px solid var(--line);border-radius:4px;
+    padding:7px;font-family:inherit;font-size:10px;letter-spacing:.12em;transition:.15s}
+  #freezebtn:hover{border-color:var(--teal);color:var(--teal)}
+  #freezebtn.frozen{border-color:var(--red);color:var(--red);background:#c8322f18}
+
+  /* touch controls */
+  #touch{position:fixed;inset:0;z-index:21;display:none;pointer-events:none}
+  #touch .tbtn{position:absolute;bottom:0;pointer-events:auto;display:flex;align-items:center;justify-content:center;
+    font-family:'Anton';font-size:34px;color:#f4ecd855}
+  #tL{left:0;width:28%;height:46%}
+  #tR{right:0;width:28%;height:46%}
+  #tThrow{left:28%;width:44%;height:32%;font-size:15px;letter-spacing:.1em}
+  body.touch #touch{display:block}
+
+  /* info button */
+  #info{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:30;
+    width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#0008;color:var(--cream);
+    font-family:'Anton';cursor:pointer;pointer-events:auto;font-size:15px}
+  #info:hover{border-color:var(--gold);color:var(--gold)}
+
+  /* ── overlays ── */
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:radial-gradient(120% 90% at 50% 0%,#141a38f2,#070a18fa)}
+  .overlay.hide{display:none}
+  .card{max-width:560px;width:100%;text-align:center;position:relative}
+  .kicker{display:inline-block;font-size:11px;letter-spacing:.28em;color:var(--ink);background:var(--gold);
+    padding:5px 12px;border-radius:2px;margin-bottom:18px}
+  .title{font-size:clamp(52px,13vw,104px);color:var(--cream);position:relative;
+    text-shadow:5px 5px 0 var(--red), 10px 10px 0 #00000055}
+  .title .m{color:var(--gold)}
+  .sub{margin:16px auto 6px;font-size:14px;color:#d7d2be;max-width:440px;line-height:1.55}
+  .rules{margin:20px auto 0;max-width:430px;text-align:left;font-size:12.5px;color:var(--mut);line-height:1.7}
+  .rules b{color:var(--cream)}
+  .rules .key{display:inline-block;min-width:20px;text-align:center;border:1px solid var(--line);border-radius:3px;padding:1px 6px;color:var(--cream);background:#0006}
+  .btn{margin-top:24px;display:inline-block;cursor:pointer;pointer-events:auto;font-family:'Anton';font-size:22px;letter-spacing:.06em;
+    color:var(--ink);background:var(--gold);border:none;border-radius:4px;padding:13px 34px;box-shadow:4px 4px 0 #00000066;transition:transform .1s}
+  .btn:hover{transform:translate(-1px,-1px)}
+  .btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #00000066}
+  .btn.ghost{background:transparent;color:var(--cream);border:1px solid var(--line);box-shadow:none;font-size:15px;padding:10px 22px}
+  .small{margin-top:16px;font-size:11px;color:var(--mut);line-height:1.6}
+  .small a{color:var(--teal)}
+  .end-title{font-size:clamp(40px,10vw,74px)}
+  .end-stat{font-size:14px;color:#d7d2be;margin-top:10px}
+  .end-stat b{color:var(--gold);font-size:20px;font-variant-numeric:tabular-nums}
+  .credit{position:fixed;bottom:14px;left:0;right:0;text-align:center;font-size:10px;color:#5a608a;z-index:25;pointer-events:auto}
+  .credit a{color:#7a80aa}
+  @media (max-width:560px){
+    #crownpanel{width:150px;right:12px;bottom:12px;padding:9px}
+    #topbar{left:12px;right:12px;top:12px}
+    .stat .v{font-size:17px}.stat .v.big{font-size:22px}
+    .meter{width:92px}
+    .credit{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game"></canvas></div>
+<div id="halftone"></div>
+<div id="grain"></div>
+<div class="crop tl"></div><div class="crop tr"></div><div class="crop bl"></div><div class="crop br"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="row" id="topbar">
+    <div style="display:flex;gap:22px;align-items:center">
+      <div class="stat"><span class="k">SCORE</span><span class="v big" id="score">0</span></div>
+      <div class="stat"><span class="k">TOWNS WARNED</span><span class="v" id="warned">0</span></div>
+    </div>
+    <div style="display:flex;gap:22px;align-items:center">
+      <div class="stat"><span class="k">ALARM</span><div class="meter" id="alarmmeter"><i></i></div></div>
+      <div class="stat"><span class="k">DAWN</span><div class="meter" id="dawnmeter"><i></i></div></div>
+      <div class="stat"><span class="k">RIDES LEFT</span><span id="lives"></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Crown's Mind -->
+<div id="crownpanel">
+  <div class="hd"><span class="t">◢ THE CROWN'S MIND</span></div>
+  <div id="bars">
+    <div class="bar"><i></i><span class="lab">L1</span></div>
+    <div class="bar"><i></i><span class="lab">L2</span></div>
+    <div class="bar"><i></i><span class="lab">L3</span></div>
+    <div class="bar"><i></i><span class="lab">L4</span></div>
+  </div>
+  <div id="crownread"><span>reads your lane</span><b id="readpct">—</b></div>
+  <button id="freezebtn">❄ FREEZE THE CROWN</button>
+</div>
+
+<!-- touch -->
+<div id="touch">
+  <div class="tbtn" id="tL">◄</div>
+  <div class="tbtn" id="tThrow">THROW ▲</div>
+  <div class="tbtn" id="tR">►</div>
+</div>
+
+<button id="info" title="How it works">i</button>
+
+<!-- intro -->
+<div class="overlay" id="intro">
+  <div class="card">
+    <span class="kicker">BUILT ON YESTERDAY · SUMMER INTO AI · WK 4</span>
+    <h1 class="title display">MIDNIGHT<br><span class="m">MACHINE</span></h1>
+    <p class="sub">Paul Revere's midnight ride — except the British aren't scripted. They run a <b style="color:var(--cream)">learning model</b> that watches how you ride and moves to cut you off. The longer you play, the better it reads you.</p>
+    <div class="rules">
+      <div><span class="key">A</span><span class="key">D</span> or <span class="key">◄</span><span class="key">►</span> — change lanes &nbsp; · &nbsp; <span class="key">Space</span> — throw a broadside</div>
+      <div style="margin-top:8px">▸ <b>Warn every town</b> you pass by hitting it with a broadside.</div>
+      <div>▸ <b>Dodge the redcoats.</b> They spawn where the Crown predicts you'll be.</div>
+      <div>▸ <b>Reach dawn</b> with rides to spare. Watch the Crown's Mind, bottom-right — those bars are its live guess of your next lane. Freeze it and the British go back to guessing blind.</div>
+    </div>
+    <button class="btn" id="startbtn">RIDE ▸</button>
+    <p class="small">A tribute-extension of <a href="https://bluntforceriot.github.io/ride-revere-ride/" target="_blank" rel="noopener">Adam's “Ride, Revere, Ride!”</a> — his arcade ride, plus the one thing arcade games never have: an opponent that learns you.</p>
+  </div>
+</div>
+
+<!-- game over / win -->
+<div class="overlay hide" id="endcard">
+  <div class="card">
+    <span class="kicker" id="endkicker">THE SUN IS UP</span>
+    <h1 class="title display end-title" id="endtitle">CAUGHT</h1>
+    <p class="end-stat">Score <b id="endscore">0</b></p>
+    <p class="end-stat">Towns warned <b id="endwarned">0</b> &nbsp;·&nbsp; The Crown read you <b id="endread">0%</b> of the time</p>
+    <p class="sub" id="endflavor"></p>
+    <button class="btn" id="againbtn">RIDE AGAIN ▸</button>
+    <div><button class="btn ghost" id="sharebtn">COPY THIS ROAD ▸</button></div>
+    <p class="small">Best this session: <b style="color:var(--gold)" id="bestscore">0</b></p>
+  </div>
+</div>
+
+<div class="credit">One file · no libraries · a from-scratch learning opponent — built on <a href="https://safetylast.substack.com/p/ride-revere-ride-i-built-a-tiny-paul" target="_blank" rel="noopener">Adam's Ride, Revere, Ride!</a></div>
+
+<script>
+"use strict";
+/* ────────────────────────────────────────────────────────────────────────
+   MIDNIGHT MACHINE — a Paul Revere lane-runner whose Crown *learns* you.
+   Built on Adam (@safetylast)'s "Ride, Revere, Ride!" for Summer Into AI, Wk4.
+   Single file, no libraries. Logic runs on a fixed timestep so it can be
+   simulated headlessly via window.__ride (see bottom).
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ---------- seeded RNG (mulberry32) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hashSeed(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+
+/* ---------- the learning Crown (shared by game + headless benchmark) ---------- */
+const N_LANES = 4;
+function makeCrown(){
+  // Laplace-smoothed transition COUNTS: how you tend to move lane i -> lane j
+  const trans = Array.from({length:N_LANES},()=>new Array(N_LANES).fill(1));
+  let lastLane = null;
+  const acc = []; // rolling record of whether it predicted your lane correctly
+  function sample(lane){ if(lastLane!==null && lane!==lastLane){ trans[lastLane][lane]++; } else if(lastLane!==null){ trans[lastLane][lane]++; } lastLane = lane; }
+  function rowProb(i){ const r=trans[i]; const s=r[0]+r[1]+r[2]+r[3]; return [r[0]/s,r[1]/s,r[2]/s,r[3]/s]; }
+  function predict(curLane, steps){
+    let v=[0,0,0,0]; v[curLane]=1;
+    steps=Math.max(1,Math.min(8,steps|0));
+    for(let s=0;s<steps;s++){
+      const nv=[0,0,0,0];
+      for(let i=0;i<N_LANES;i++){ if(v[i]>0){ const p=rowProb(i); for(let j=0;j<N_LANES;j++) nv[j]+=v[i]*p[j]; } }
+      v=nv;
+    }
+    return v;
+  }
+  function chooseLane(curLane, steps, frozen, rng){
+    if(frozen) return (rng()*N_LANES)|0;
+    if(rng()<0.12) return (rng()*N_LANES)|0;      // exploration — keeps it from being trivially juked
+    const v=predict(curLane, steps);
+    let best=0; for(let i=1;i<N_LANES;i++) if(v[i]>v[best]) best=i;
+    return best;
+  }
+  function recordAccuracy(hit){ acc.push(hit?1:0); if(acc.length>24) acc.shift(); }
+  function accuracy(){ if(!acc.length) return 0; let s=0; for(const a of acc) s+=a; return s/acc.length; }
+  function reset(){ for(let i=0;i<N_LANES;i++){ for(let j=0;j<N_LANES;j++) trans[i][j]=1; } lastLane=null; acc.length=0; }
+  return {trans,sample,rowProb,predict,chooseLane,recordAccuracy,accuracy,reset};
+}
+
+/* ---------- headless benchmark: proves learning beats a blind Crown ----------
+   A synthetic "habitual" rider (stays put with prob `stay`, else drifts).
+   Returns how often the Crown put a redcoat in the rider's actual lane.      */
+function benchmark(opts){
+  const o = Object.assign({steps:6000, seed:7, learn:true, stay:0.6, lead:4}, opts||{});
+  const rng = mulberry32(o.seed);
+  const crown = makeCrown();
+  let lane = 1;
+  const pending = []; let hits=0, trials=0;
+  for(let t=0;t<o.steps;t++){
+    if(t%2===0){
+      const chosen = crown.chooseLane(lane, o.lead, !o.learn, rng);
+      pending.push({lane:chosen, arrive:t+o.lead});
+    }
+    for(let i=pending.length-1;i>=0;i--){ if(pending[i].arrive===t){ trials++; if(pending[i].lane===lane) hits++; pending.splice(i,1);} }
+    if(rng() > o.stay){ const r=rng(); lane = r<0.5 ? Math.max(0,lane-1) : Math.min(3,lane+1); }
+    if(o.learn) crown.sample(lane);
+  }
+  return {hitRate: trials? +(hits/trials).toFixed(4):0, trials};
+}
+
+/* ============================ THE GAME ============================ */
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.floor(W*DPR); cv.height = Math.floor(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize); resize();
+
+// road geometry (recomputed per frame off W/H)
+function roadGeom(){
+  const rw = Math.min(W*0.72, 520);
+  const left = (W-rw)/2, laneW = rw/N_LANES;
+  const riderY = H*0.80;
+  return {rw,left,laneW,riderY, laneX:(i)=>left+laneW*(i+0.5)};
+}
+
+const COL = {red:'#c8322f', redDark:'#7a1e1c', blue:'#3c3b6e', cream:'#f4ecd8', gold:'#e0a72a', amber:'#ffb020', mud:'#5c4326', house:'#e7dcc2', roof:'#9c3b34', warm:'#ffcf70'};
+
+// ---- game state ----
+let G = null;
+function newGame(seedStr){
+  const seed = seedStr!=null ? hashSeed(seedStr) : (Math.random()*1e9)|0;
+  G = {
+    seedStr: seedStr!=null ? seedStr : (''+seed),
+    rng: mulberry32(seed),
+    crown: makeCrown(),
+    frozen:false,
+    running:false, over:false, won:false,
+    t:0,               // seconds elapsed (logic)
+    duration:78,       // seconds to dawn
+    rider:{lane:1, x:0, targetLane:1},
+    lives:3, invuln:0,
+    score:0, warned:0, missed:0, combo:0,
+    alarm:0,           // 0..1
+    speed:0,           // px/s, ramps
+    scroll:0,
+    entities:[],       // {kind:'redcoat'|'house'|'mud', lane, y, warned?, predLane?, scored?}
+    broadsides:[],     // {lane, y}
+    particles:[],
+    stars:[],
+    // spawn clocks
+    spawnRed:0, spawnHouse:0, sampleClock:0,
+    lastSampleLane:1,
+    predDist:[0.25,0.25,0.25,0.25], predLane:1,
+    sky:0,             // 0 night -> 1 dawn
+    shake:0,
+  };
+  const g=roadGeom(); G.rider.x=g.laneX(1);
+  for(let i=0;i<90;i++){ G.stars.push({x:G.rng(), y:G.rng()*0.7, r:G.rng()*1.4+0.3, tw:G.rng()*6}); }
+  updateLives();
+}
+
+/* ---------- fixed-timestep logic ---------- */
+const DT = 1/60;
+function stepLogic(dt){
+  if(!G || !G.running || G.over) return;
+  const g = roadGeom();
+  G.t += dt;
+  // difficulty ramp
+  const prog = Math.min(1, G.t/G.duration);
+  G.speed = H*(0.34 + 0.30*prog);
+  G.sky = Math.max(0, (prog-0.62)/0.38);   // dawn begins ~62% through
+  if(G.invuln>0) G.invuln=Math.max(0,G.invuln-dt);
+  if(G.shake>0) G.shake=Math.max(0,G.shake-dt*3);
+
+  // win at dawn
+  if(G.t>=G.duration){ endGame(true); return; }
+
+  // rider lane -> x lerp
+  G.rider.x += (g.laneX(G.rider.lane)-G.rider.x)*Math.min(1,dt*16);
+
+  // sample rider lane for the Crown (4x/sec)
+  G.sampleClock+=dt;
+  if(G.sampleClock>=0.25){
+    G.sampleClock-=0.25;
+    G.crown.sample(G.rider.lane);
+  }
+
+  // live prediction for the HUD (what lane it thinks you'll be in a moment)
+  {
+    const arriveSteps = 3;
+    G.predDist = G.crown.predict(G.rider.lane, arriveSteps);
+    let b=0; for(let i=1;i<4;i++) if(G.predDist[i]>G.predDist[b]) b=i; G.predLane=b;
+  }
+
+  // ---- spawns ----
+  G.spawnRed -= dt;
+  const redEvery = 1.15 - 0.55*prog;   // faster over time
+  if(G.spawnRed<=0){
+    G.spawnRed = redEvery*(0.72+G.rng()*0.6);
+    const timeToRider = (g.riderY-(-60))/G.speed;
+    const steps = Math.max(1, Math.round(timeToRider/0.25));
+    const lane = G.crown.chooseLane(G.rider.lane, steps, G.frozen, G.rng);
+    G.entities.push({kind:'redcoat', lane, y:-60, predLane:lane, scored:false, bob:G.rng()*6});
+  }
+  G.spawnHouse -= dt;
+  if(G.spawnHouse<=0){
+    G.spawnHouse = (0.9+G.rng()*0.7);
+    // house in a lane that isn't the just-spawned redcoat if possible
+    let lane=(G.rng()*4)|0;
+    G.entities.push({kind:'house', lane, y:-70, warned:false, scored:false, side:G.rng()<0.5?-1:1});
+  }
+  // occasional mud (pure hazard, random)
+  if(G.rng()<dt*0.5){
+    G.entities.push({kind:'mud', lane:(G.rng()*4)|0, y:-40});
+  }
+
+  // ---- move entities ----
+  for(const e of G.entities){ e.y += G.speed*dt; }
+  // broadsides fly up
+  for(const b of G.broadsides){ b.y -= (G.speed+H*0.9)*dt; }
+
+  // ---- broadside vs house hits ----
+  for(const b of G.broadsides){
+    for(const e of G.entities){
+      if(e.kind==='house' && !e.warned && e.lane===b.lane && Math.abs(e.y-b.y)<28){
+        e.warned=true; b.dead=true;
+        G.warned++; G.combo++; G.alarm=Math.min(1,G.alarm+0.05);
+        const pts = 100 + G.combo*15;
+        G.score += pts;
+        spawnBurst(g.laneX(e.lane), e.y, COL.warm, 16);
+        break;
+      }
+    }
+  }
+  G.broadsides = G.broadsides.filter(b=>!b.dead && b.y>-40);
+
+  // ---- collisions + crossings ----
+  for(const e of G.entities){
+    const crossed = e.y>=g.riderY;
+    if((e.kind==='redcoat'||e.kind==='mud') && !e.scored && crossed){
+      e.scored=true;
+      if(e.kind==='redcoat'){
+        // did the Crown predict correctly? (was the redcoat in your lane as it passed)
+        G.crown.recordAccuracy(e.lane===G.rider.lane);
+      }
+      if(e.lane===G.rider.lane && G.invuln<=0){
+        // hit
+        crash();
+      }
+    }
+    if(e.kind==='house' && !e.scored && crossed){
+      e.scored=true;
+      if(!e.warned){ G.combo=0; G.missed++; }  // passed a town without warning it
+    }
+  }
+  // survival score
+  G.score += dt*22*(1+prog);
+
+  // cull
+  G.entities = G.entities.filter(e=> e.y < H+90);
+  // particles
+  for(const p of G.particles){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=p.g*dt; p.life-=dt; }
+  G.particles = G.particles.filter(p=>p.life>0);
+}
+
+function crash(){
+  G.lives--; G.invuln=1.4; G.combo=0; G.shake=1;
+  const g=roadGeom();
+  spawnBurst(G.rider.x, g.riderY, COL.red, 22);
+  updateLives();
+  if(G.lives<=0){ endGame(false); }
+}
+
+function spawnBurst(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=Math.random()*180+40;
+    G.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,g:340,life:0.5+Math.random()*0.5,color,r:Math.random()*2.5+1});
+  }
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  const g = roadGeom();
+  ctx.save();
+  if(G && G.shake>0){ const s=G.shake*8; ctx.translate((Math.random()-0.5)*s,(Math.random()-0.5)*s); }
+
+  // sky
+  const sky = G? G.sky : 0;
+  const top = mix('#070a18','#f7b76a',sky*0.85), bot = mix('#141a38','#ffd9a0',sky*0.7);
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,top); grad.addColorStop(1,bot);
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+
+  // stars fade with dawn
+  if(G){
+    ctx.fillStyle='#fff';
+    for(const st of G.stars){ const a=(0.5+0.5*Math.sin(G.t*2+st.tw))*(1-sky); if(a<=0)continue; ctx.globalAlpha=a*0.9; ctx.fillRect(st.x*W, st.y*H, st.r, st.r);}
+    ctx.globalAlpha=1;
+    // moon -> sun
+    const mx=W*0.80, my=H*0.16+sky*H*0.05;
+    ctx.beginPath(); ctx.arc(mx,my, 30+sky*8, 0,7);
+    ctx.fillStyle=mix('#dfe4ff','#fff2c0',sky); ctx.shadowColor=mix('#8892d0','#ffd07a',sky); ctx.shadowBlur=40; ctx.fill(); ctx.shadowBlur=0;
+  }
+
+  // horizon hills
+  ctx.fillStyle=mix('#0c1330','#caa06a',sky*0.6);
+  ctx.beginPath(); ctx.moveTo(0,H*0.34);
+  for(let x=0;x<=W;x+=40){ ctx.lineTo(x, H*0.34 + Math.sin(x*0.01+3)*10 + Math.sin(x*0.023)*8); }
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.fill();
+
+  // road (straight band)
+  const rl=g.left, rr=g.left+g.rw;
+  ctx.fillStyle=mix('#12162b','#2c2417',sky*0.4);
+  ctx.fillRect(rl,0,g.rw,H);
+  // road edges
+  ctx.fillStyle=mix('#2a3057','#5a4a30',sky*0.4);
+  ctx.fillRect(rl-4,0,4,H); ctx.fillRect(rr,0,4,H);
+
+  // scrolling lane dashes
+  if(G){
+    ctx.fillStyle=mix('#3a4066','#8a7040',sky*0.5);
+    const off = (G.scroll)% 44;
+    for(let i=1;i<N_LANES;i++){
+      const x=g.left+g.laneW*i-1.5;
+      for(let y=-44+off; y<H; y+=44){ ctx.globalAlpha=.5; ctx.fillRect(x,y,3,22);}
+    }
+    ctx.globalAlpha=1;
+  }
+
+  if(!G){ ctx.restore(); return; }
+
+  // entities (far to near)
+  const ents=[...G.entities].sort((a,b)=>a.y-b.y);
+  for(const e of ents){
+    const x=g.laneX(e.lane), y=e.y;
+    if(e.kind==='house') drawHouse(x,y,e);
+    else if(e.kind==='mud') drawMud(x,y);
+    else drawRedcoat(x,y,e);
+  }
+
+  // broadsides
+  for(const b of G.broadsides){ drawBroadside(g.laneX(b.lane), b.y, G.t); }
+
+  // rider
+  drawRider(G.rider.x, g.riderY, G.t, G.invuln);
+
+  // particles
+  for(const p of G.particles){ ctx.globalAlpha=Math.max(0,Math.min(1,p.life*2)); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.r,p.r);}
+  ctx.globalAlpha=1;
+
+  // dawn wash
+  if(sky>0){ ctx.fillStyle=`rgba(255,180,90,${sky*0.16})`; ctx.fillRect(0,0,W,H); }
+
+  ctx.restore();
+}
+
+function drawRedcoat(x,y,e){
+  ctx.save(); ctx.translate(x,y);
+  const bob=Math.sin((G.t*10)+(e.bob||0))*1.5; ctx.translate(0,bob);
+  // shadow
+  ctx.fillStyle='#0006'; ctx.beginPath(); ctx.ellipse(0,16,14,5,0,0,7); ctx.fill();
+  // body (red coat)
+  ctx.fillStyle=COL.red; ctx.fillRect(-9,-6,18,22);
+  ctx.fillStyle=COL.redDark; ctx.fillRect(-9,-6,18,4);
+  // white cross belts
+  ctx.fillStyle=COL.cream; ctx.fillRect(-2,-6,3,22);
+  // head + bearskin hat
+  ctx.fillStyle='#e8c9a0'; ctx.fillRect(-5,-16,10,10);
+  ctx.fillStyle='#12121a'; ctx.fillRect(-7,-26,14,12);
+  // musket
+  ctx.fillStyle='#3a2a1a'; ctx.fillRect(9,-18,3,30);
+  ctx.restore();
+}
+function drawHouse(x,y,e){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='#0006'; ctx.beginPath(); ctx.ellipse(0,20,18,5,0,0,7); ctx.fill();
+  // body
+  ctx.fillStyle=e.warned? COL.house : mix(COL.house,'#6a6350',0.35);
+  ctx.fillRect(-16,-4,32,24);
+  // roof
+  ctx.fillStyle=e.warned? COL.roof : '#4a3f38';
+  ctx.beginPath(); ctx.moveTo(-20,-4); ctx.lineTo(0,-22); ctx.lineTo(20,-4); ctx.closePath(); ctx.fill();
+  // window — lights up warm when warned
+  ctx.fillStyle=e.warned? COL.warm : '#20242f';
+  ctx.fillRect(-6,4,12,12);
+  if(e.warned){ ctx.shadowColor=COL.warm; ctx.shadowBlur=18; ctx.fillRect(-6,4,12,12); ctx.shadowBlur=0; }
+  ctx.restore();
+}
+function drawMud(x,y){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle=COL.mud; ctx.beginPath(); ctx.ellipse(0,0,18,7,0,0,7); ctx.fill();
+  ctx.fillStyle='#3e2d18'; ctx.beginPath(); ctx.ellipse(-5,-1,6,3,0,0,7); ctx.fill();
+  ctx.restore();
+}
+function drawBroadside(x,y,t){
+  ctx.save(); ctx.translate(x,y); ctx.rotate(t*14);
+  ctx.fillStyle=COL.cream; ctx.fillRect(-6,-8,12,16);
+  ctx.fillStyle='#9a8f74'; ctx.fillRect(-6,-4,12,2); ctx.fillRect(-6,0,12,2);
+  ctx.restore();
+}
+function drawRider(x,y,t,invuln){
+  ctx.save(); ctx.translate(x,y);
+  if(invuln>0 && Math.floor(t*16)%2===0) ctx.globalAlpha=0.4;
+  const bob=Math.sin(t*14)*2;
+  ctx.fillStyle='#0007'; ctx.beginPath(); ctx.ellipse(0,20,20,6,0,0,7); ctx.fill();
+  ctx.translate(0,bob);
+  // horse
+  ctx.fillStyle='#3a2a1c'; ctx.fillRect(-16,2,32,12);
+  ctx.fillRect(12,-2,8,10);          // head
+  ctx.fillRect(-16,12,5,10); ctx.fillRect(11,12,5,10); // legs
+  // rider body (continental blue)
+  ctx.fillStyle=COL.blue; ctx.fillRect(-6,-14,12,18);
+  ctx.fillStyle='#e8c9a0'; ctx.fillRect(-4,-22,8,8); // head
+  ctx.fillStyle='#1a1a24'; ctx.fillRect(-6,-26,12,5); // tricorn
+  // lantern glow
+  ctx.fillStyle=COL.warm; ctx.shadowColor=COL.warm; ctx.shadowBlur=20;
+  ctx.fillRect(-14,-10,5,7); ctx.shadowBlur=0;
+  ctx.restore();
+}
+
+// linear color mix "#rrggbb"
+function mix(a,b,t){ t=Math.max(0,Math.min(1,t)); const ca=hx(a),cb=hx(b); return `rgb(${Math.round(ca[0]+(cb[0]-ca[0])*t)},${Math.round(ca[1]+(cb[1]-ca[1])*t)},${Math.round(ca[2]+(cb[2]-ca[2])*t)})`; }
+function hx(h){ h=h.replace('#',''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+
+/* ---------- HUD sync ---------- */
+const el = id=>document.getElementById(id);
+function updateLives(){ el('lives').innerHTML = '🏮'.repeat(Math.max(0,G?G.lives:0)) || '—'; }
+function syncHUD(){
+  if(!G) return;
+  el('score').textContent = Math.floor(G.score).toLocaleString();
+  el('warned').textContent = G.warned;
+  el('alarmmeter').firstElementChild.style.width = (G.alarm*100)+'%';
+  el('dawnmeter').firstElementChild.style.width = Math.min(100,(G.t/G.duration*100))+'%';
+  // Crown's Mind bars
+  const bars = document.querySelectorAll('#bars .bar');
+  bars.forEach((bar,i)=>{
+    bar.firstElementChild.style.height = Math.round(G.predDist[i]*100)+'%';
+    bar.classList.toggle('pred', i===G.predLane && !G.frozen);
+  });
+  el('readpct').textContent = G.frozen ? 'BLIND' : Math.round(G.crown.accuracy()*100)+'%';
+  el('readpct').style.color = G.frozen ? 'var(--red)' : (G.crown.accuracy()>0.4?'var(--amber)':'var(--cream)');
+}
+
+/* ---------- main loop (rAF for smoothness; logic on fixed accumulator) ---------- */
+let acc=0, lastT=performance.now();
+function frame(now){
+  let dt=(now-lastT)/1000; lastT=now; if(dt>0.1) dt=0.1;
+  acc+=dt;
+  while(acc>=DT){ stepLogic(DT); if(G && G.running && !G.over){ G.scroll += G.speed*DT; } acc-=DT; }
+  render(); syncHUD();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- input ---------- */
+function move(dir){ if(!G||!G.running||G.over) return; G.rider.lane=Math.max(0,Math.min(3,G.rider.lane+dir)); }
+function throwBroadside(){ if(!G||!G.running||G.over) return; if(G.broadsides.length>3) return; G.broadsides.push({lane:G.rider.lane, y:roadGeom().riderY-20}); }
+window.addEventListener('keydown', e=>{
+  if(e.repeat) return;
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a'){ move(-1); e.preventDefault(); }
+  else if(k==='arrowright'||k==='d'){ move(1); e.preventDefault(); }
+  else if(k===' '||k==='arrowup'||k==='w'){ throwBroadside(); e.preventDefault(); }
+  else if(k==='f'){ toggleFreeze(); }
+});
+// touch
+if('ontouchstart' in window){ document.body.classList.add('touch'); }
+function bindTap(id,fn){ const n=el(id); const h=e=>{e.preventDefault(); fn();}; n.addEventListener('touchstart',h,{passive:false}); n.addEventListener('mousedown',h); }
+bindTap('tL',()=>move(-1)); bindTap('tR',()=>move(1)); bindTap('tThrow',throwBroadside);
+
+/* ---------- freeze toggle ---------- */
+function toggleFreeze(){ if(!G) return; G.frozen=!G.frozen; const b=el('freezebtn'); b.classList.toggle('frozen',G.frozen); b.textContent = G.frozen? '◉ CROWN FROZEN — riding blind' : '❄ FREEZE THE CROWN'; }
+el('freezebtn').addEventListener('click', toggleFreeze);
+
+/* ---------- flow ---------- */
+let best=0;
+function startGame(seedStr){
+  newGame(seedStr);
+  G.running=true;
+  el('intro').classList.add('hide'); el('endcard').classList.add('hide');
+  el('freezebtn').classList.remove('frozen'); el('freezebtn').textContent='❄ FREEZE THE CROWN';
+}
+function endGame(won){
+  if(G.over) return;
+  G.over=true; G.won=won; G.running=false;
+  best=Math.max(best, Math.floor(G.score));
+  el('endkicker').textContent = won? 'THE COUNTRYSIDE IS AWAKE' : 'RUN DOWN BY THE CROWN';
+  el('endtitle').textContent = won? 'DAWN!' : 'CAUGHT';
+  el('endtitle').style.textShadow = won? '5px 5px 0 var(--gold),10px 10px 0 #00000055':'5px 5px 0 var(--red),10px 10px 0 #00000055';
+  el('endscore').textContent = Math.floor(G.score).toLocaleString();
+  el('endwarned').textContent = G.warned;
+  const read=Math.round(G.crown.accuracy()*100);
+  el('endread').textContent = read+'%';
+  el('bestscore').textContent = best.toLocaleString();
+  el('endflavor').innerHTML = won
+    ? `You beat the dawn. The Crown learned to read your lane <b style="color:var(--gold)">${read}%</b> of the time — imagine how it rides <i>next</i> time.`
+    : (G.frozen
+        ? `You rode with the Crown frozen — so that was pure luck and reflex. Turn its mind back on and see how much faster it finds you.`
+        : `It read you <b style="color:var(--gold)">${read}%</b> of the time by the end. It doesn't forget — but a fresh road resets its memory.`);
+  if(won){ dawnBurst(); }
+}
+function dawnBurst(){ const g=roadGeom(); for(let i=0;i<80;i++){ G.particles.push({x:Math.random()*W,y:H*0.4+Math.random()*H*0.4,vx:(Math.random()-0.5)*60,vy:-Math.random()*120-20,g:60,life:1.5+Math.random(),color:i%2?COL.warm:COL.gold,r:Math.random()*3+1}); } }
+
+el('startbtn').addEventListener('click', ()=>{ const h=location.hash.replace('#',''); startGame(h && h.startsWith('road=')? decodeURIComponent(h.slice(5)) : null); });
+el('againbtn').addEventListener('click', ()=> startGame(null));
+el('sharebtn').addEventListener('click', ()=>{
+  const url = location.origin+location.pathname+'#road='+encodeURIComponent(G.seedStr);
+  navigator.clipboard?.writeText(url).then(()=>{ el('sharebtn').textContent='COPIED ✓'; setTimeout(()=>el('sharebtn').textContent='COPY THIS ROAD ▸',1400); }).catch(()=>{});
+});
+el('info').addEventListener('click', ()=>{ if(G) G.running=false; el('intro').classList.remove('hide'); });
+
+/* ---------- headless harness ---------- */
+window.__ride = {
+  makeCrown, benchmark, mulberry32,
+  get state(){ return G; },
+  simulate(seconds, opts){        // advance live logic headlessly
+    opts=opts||{}; if(!G||G.over) newGame(opts.seed!=null?String(opts.seed):'test');
+    G.running=true; if(opts.frozen!=null) G.frozen=opts.frozen;
+    const auto=opts.autopilot; let bl=G.rider.lane;
+    const n=Math.round(seconds/DT);
+    for(let i=0;i<n;i++){
+      if(auto){ // simple habitual autopilot: mostly stay, sometimes drift toward center
+        if(G.rng()>0.82){ G.rider.lane = G.rng()<0.5? Math.max(0,G.rider.lane-1):Math.min(3,G.rider.lane+1); }
+        if(G.rng()<0.04) throwBroadside();
+      }
+      stepLogic(DT); G.scroll+=G.speed*DT;
+    }
+    return {t:G.t, score:Math.floor(G.score), warned:G.warned, lives:G.lives, over:G.over, won:G.won, read:+G.crown.accuracy().toFixed(3), predLane:G.predLane};
+  },
+  selfTest(){
+    const L=benchmark({learn:true, seed:11}), F=benchmark({learn:false, seed:11});
+    const pass = L.hitRate > F.hitRate + 0.05 && Math.abs(F.hitRate-0.25)<0.06;
+    return {learnHitRate:L.hitRate, frozenHitRate:F.hitRate, lift:+(L.hitRate-F.hitRate).toFixed(3), pass};
+  }
+};
+
+// preload rider onto road for the intro backdrop
+newGame(location.hash.startsWith('#road=')?decodeURIComponent(location.hash.slice(6)):null);
+G.running=false;
+</script>
+</body>
+</html>
