@@ -54,7 +54,7 @@
   /* Crown's Mind panel */
   #crownpanel{position:fixed;right:24px;bottom:24px;z-index:22;width:186px;
     background:linear-gradient(180deg,#141a38ee,#0b1026ee);border:1px solid var(--line);
-    border-radius:8px;padding:12px 12px 10px;pointer-events:auto;backdrop-filter:blur(3px)}
+    border-radius:8px;padding:12px 12px 10px;pointer-events:none;backdrop-filter:blur(3px)}
   #crownpanel .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
   #crownpanel .hd .t{font-size:10px;letter-spacing:.16em;color:var(--teal)}
   #bars{display:flex;gap:6px;height:64px;align-items:flex-end}
@@ -185,7 +185,7 @@
     <p class="sub">Paul Revere's midnight ride — except the British aren't scripted. They run a <b style="color:var(--cream)">learning model</b> that watches how you ride and moves to cut you off. The longer you play, the better it reads you.</p>
     <div class="rules">
       <div><span class="key">A</span><span class="key">D</span> or <span class="key">◄</span><span class="key">►</span> — change lanes &nbsp; · &nbsp; <span class="key">Space</span> — throw a broadside</div>
-      <div style="margin-top:8px">▸ <b>Warn every town</b> you pass by hitting it with a broadside.</div>
+      <div style="margin-top:8px">▸ <b>Warn every town</b> you pass by hitting it with a broadside — fill the <b>ALARM</b> and the countryside rises to <b>shield</b> you.</div>
       <div>▸ <b>Dodge the redcoats.</b> They spawn where the Crown predicts you'll be.</div>
       <div>▸ <b>Reach dawn</b> with rides to spare. Watch the Crown's Mind, bottom-right — those bars are its live guess of your next lane. Freeze it and the British go back to guessing blind.</div>
     </div>
@@ -291,9 +291,10 @@ window.addEventListener('resize', resize); resize();
 
 // road geometry (recomputed per frame off W/H)
 function roadGeom(){
-  const rw = Math.min(W*0.72, 520);
+  const mobile = W<=560;
+  const rw = Math.min(W*(mobile?0.86:0.72), 520);
   const left = (W-rw)/2, laneW = rw/N_LANES;
-  const riderY = H*0.80;
+  const riderY = H*(mobile?0.62:0.80);   // raise the rider clear of the bottom panel/controls on phones
   return {rw,left,laneW,riderY, laneX:(i)=>left+laneW*(i+0.5)};
 }
 
@@ -372,6 +373,8 @@ function newGame(seedStr){
     timeScale:1,       // near-miss slow-mo
     lastLaneChangeT:-9,
     popups:[],         // {x,y,text,color,life,size}
+    shield:0,          // militia shield seconds (full alarm reward)
+    escalated:false,   // has the Crown started double-blocking yet
   };
   const g=roadGeom(); G.rider.x=g.laneX(1);
   for(let i=0;i<90;i++){ G.stars.push({x:G.rng(), y:G.rng()*0.7, r:G.rng()*1.4+0.3, tw:G.rng()*6}); }
@@ -389,6 +392,7 @@ function stepLogic(dt){
   G.speed = H*(0.34 + 0.30*prog);
   G.sky = Math.max(0, (prog-0.62)/0.38);   // dawn begins ~62% through
   if(G.invuln>0) G.invuln=Math.max(0,G.invuln-dt);
+  if(G.shield>0) G.shield=Math.max(0,G.shield-dt);
   if(G.shake>0) G.shake=Math.max(0,G.shake-dt*3);
 
   // gallop hoofbeats, tempo rising with the ride
@@ -424,6 +428,20 @@ function stepLogic(dt){
     const steps = Math.max(1, Math.round(timeToRider/0.25));
     const lane = G.crown.chooseLane(G.rider.lane, steps, G.frozen, G.rng);
     G.entities.push({kind:'redcoat', lane, y:-60, predLane:lane, scored:false, bob:G.rng()*6});
+    // ESCALATION: once it's confident and late, the Crown double-blocks your
+    // two most-likely lanes — you feel it getting better at reading you.
+    if(!G.frozen){
+      const conf = G.crown.accuracy();
+      const escChance = Math.max(0, prog-0.45) * Math.max(0, conf-0.30) * 3.6;
+      if(G.rng() < escChance){
+        const dist = G.crown.predict(G.rider.lane, steps);
+        let sec=-1; for(let i=0;i<N_LANES;i++){ if(i===lane) continue; if(sec<0||dist[i]>dist[sec]) sec=i; }
+        if(sec>=0){
+          G.entities.push({kind:'redcoat', lane:sec, y:-92, predLane:sec, scored:false, bob:G.rng()*6, esc:true});
+          if(!G.escalated){ G.escalated=true; addPopup(W/2, H*0.32, 'THE CROWN CLOSES IN', COL.red, 20); }
+        }
+      }
+    }
   }
   G.spawnHouse -= dt;
   if(G.spawnHouse<=0){
@@ -447,12 +465,19 @@ function stepLogic(dt){
     for(const e of G.entities){
       if(e.kind==='house' && !e.warned && e.lane===b.lane && Math.abs(e.y-b.y)<28){
         e.warned=true; b.dead=true;
-        G.warned++; G.combo++; G.alarm=Math.min(1,G.alarm+0.05);
+        G.warned++; G.combo++; G.alarm+=0.05;
         const pts = 100 + G.combo*15;
         G.score += pts;
         spawnBurst(g.laneX(e.lane), e.y, COL.warm, 16);
         Sound.sWarn(G.combo);
         addPopup(g.laneX(e.lane), e.y-14, G.combo>=2? `+${pts}  x${G.combo}` : `+${pts}`, G.combo>=2?COL.gold:COL.warm, G.combo>=3?18:14);
+        // full alarm = the countryside musters and rides with you (a shield)
+        if(G.alarm>=1){
+          G.alarm=0; G.shield=Math.max(G.shield||0, 4.0); G.invuln=Math.max(G.invuln, 4.0);
+          addPopup(G.rider.x, g.riderY-58, 'THE TOWNS RISE! — shielded', COL.gold, 20);
+          spawnBurst(G.rider.x, g.riderY, COL.gold, 26);
+          Sound.sDawn();
+        }
         break;
       }
     }
@@ -589,8 +614,16 @@ function render(){
   // broadsides
   for(const b of G.broadsides){ drawBroadside(g.laneX(b.lane), b.y, G.t); }
 
+  // militia shield ring (from a full alarm)
+  if(G.shield>0){
+    const pulse=0.6+0.4*Math.sin(G.t*8), r=32+3*Math.sin(G.t*8);
+    ctx.save(); ctx.globalAlpha=Math.min(1,G.shield)*0.9*pulse;
+    ctx.strokeStyle=COL.gold; ctx.lineWidth=2.5; ctx.shadowColor=COL.gold; ctx.shadowBlur=16;
+    ctx.beginPath(); ctx.arc(G.rider.x, g.riderY, r, 0, 7); ctx.stroke(); ctx.restore();
+  }
+
   // rider
-  drawRider(G.rider.x, g.riderY, G.t, G.invuln);
+  drawRider(G.rider.x, g.riderY, G.t, G.shield>0?0:G.invuln);
 
   // particles
   for(const p of G.particles){ ctx.globalAlpha=Math.max(0,Math.min(1,p.life*2)); ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,p.r,p.r);}
